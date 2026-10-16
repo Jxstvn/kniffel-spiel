@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kniffel – Halloween</title>
+<style>
+  :root {
+    --bg:#120d17; --card:#1f1727; --card2:#2a2034; --line:#3b2d48;
+    --text:#f3ece4; --muted:#9a8aa8; --orange:#ff7a1a; --purple:#9b5de5;
+    --lava-a:rgba(155,93,229,.48); --lava-b:rgba(255,122,26,.38);
+    --die-light:#fff8e9; --die-face:#ded2b8; --die-edge:#9b8c70; --die-pip:#34251d;
+    --die-held-top:#ffe6c6; --die-held-bottom:#f3ae68; --die-held-edge:#bd650f; --dice-tray:#17121e;
+    --radius:18px; --shadow:0 10px 30px rgba(0,0,0,.5);
+  }
+  * { box-sizing:border-box; }
+  body {
+    position:relative; isolation:isolate; margin:0; min-height:100vh; color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:radial-gradient(circle at 15% 0%,#3a1c5c 0,transparent 45%),
+               radial-gradient(circle at 90% 100%,#5a2a08 0,transparent 45%),var(--bg);
+    transition:background-color .35s,color .35s;
+  }
+  body::before, body::after {
+    content:""; position:fixed; z-index:-1; pointer-events:none; width:min(58vw,680px); aspect-ratio:1;
+    filter:blur(48px); opacity:.58; will-change:transform,border-radius;
+  }
+  body::before {
+    left:-18vw; top:-20vh;
+    background:radial-gradient(ellipse at 42% 45%,var(--lava-a) 0 20%,transparent 68%);
+    border-radius:62% 38% 54% 46% / 44% 58% 42% 56%;
+    animation:lavaDriftOne 31s ease-in-out infinite alternate;
+  }
+  body::after {
+    right:-19vw; bottom:-25vh;
+    background:radial-gradient(ellipse at 56% 48%,var(--lava-b) 0 19%,transparent 68%);
+    border-radius:43% 57% 38% 62% / 57% 42% 58% 43%;
+    animation:lavaDriftTwo 37s ease-in-out infinite alternate;
+  }
+  @keyframes lavaDriftOne {
+    0% { transform:translate3d(0,0,0) scale(.92); border-radius:62% 38% 54% 46% / 44% 58% 42% 56%; }
+    50% { transform:translate3d(19vw,24vh,0) scale(1.12); border-radius:43% 57% 39% 61% / 59% 41% 59% 41%; }
+    100% { transform:translate3d(8vw,48vh,0) scale(.98); border-radius:58% 42% 63% 37% / 40% 61% 39% 60%; }
+  }
+  @keyframes lavaDriftTwo {
+    0% { transform:translate3d(0,0,0) scale(1.08); border-radius:43% 57% 38% 62% / 57% 42% 58% 43%; }
+    50% { transform:translate3d(-20vw,-22vh,0) scale(.9); border-radius:61% 39% 53% 47% / 42% 57% 43% 58%; }
+    100% { transform:translate3d(-5vw,-46vh,0) scale(1.12); border-radius:39% 61% 60% 40% / 56% 44% 57% 43%; }
+  }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  .screen { display:none; min-height:100vh; padding:16px; }
+  .screen.active { display:block; }
+  #start.active, #end.active { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:18px; }
+
+  /* ---------- Buttons ---------- */
+  .btn { border:0; border-radius:14px; padding:14px 28px; font-weight:800; font-size:1.05rem; color:#1a0f06;
+    background:linear-gradient(135deg,#ffa23a,var(--orange)); box-shadow:0 6px 18px rgba(255,122,26,.35);
+    transition:transform .12s,box-shadow .12s,filter .12s; }
+  .btn:hover:not(:disabled) { transform:translateY(-2px); filter:brightness(1.1); box-shadow:0 10px 24px rgba(255,122,26,.55); }
+  .btn:active:not(:disabled) { transform:translateY(1px) scale(.98); }
+  .btn:disabled { background:var(--card2); color:var(--muted); box-shadow:none; cursor:not-allowed; }
+  .btn.ghost { background:transparent; border:1px solid var(--line); box-shadow:none; padding:8px 14px; font-size:.9rem; color:var(--muted); }
+  .btn.ghost:hover:not(:disabled) { color:var(--text); border-color:var(--purple); box-shadow:none; }
+
+  /* ---------- Start / Ende ---------- */
+  .title { font-size:clamp(3rem,14vw,6rem); font-weight:900; letter-spacing:.04em; margin:0;
+    background:linear-gradient(135deg,#ffb347,var(--orange),var(--purple)); -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 0 18px rgba(255,122,26,.45)); animation:flicker 4s infinite; }
+  @keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 94%{opacity:.7} 96%{opacity:1} 98%{opacity:.8} }
+  .subtitle { color:var(--muted); margin:0; }
+  .spooky { font-size:3rem; display:flex; gap:18px; }
+  .spooky span { animation:float 3s ease-in-out infinite; }
+  .spooky span:nth-child(2) { animation-delay:-1s; } .spooky span:nth-child(3) { animation-delay:-2s; }
+  @keyframes float { 0%,100%{transform:translateY(0) rotate(-5deg)} 50%{transform:translateY(-10px) rotate(5deg)} }
+  .names { display:grid; gap:10px; width:min(320px,100%); }
+  .names input { padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--text); font:inherit; text-align:center; }
+  .names input:focus { outline:2px solid var(--orange); }
+  .winner { font-size:clamp(1.6rem,7vw,2.6rem); font-weight:900; color:var(--orange); }
+  .summary { background:var(--card); border-radius:var(--radius); padding:16px 24px; box-shadow:var(--shadow); min-width:280px; border:1px solid var(--line); }
+  .summary div { padding:6px 0; color:var(--muted); }
+  .summary b { color:var(--text); font-size:1.2rem; }
+  .end-buttons { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .lobby-status { display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted); font-size:.9rem; }
+  .status-dot { width:9px; height:9px; border-radius:50%; background:#d3a64d; box-shadow:0 0 10px currentColor; }
+  .status-dot.online { color:#73bd78; background:#73bd78; }
+  .status-dot.offline { color:#d26b62; background:#d26b62; }
+  .lobby-slots { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; color:var(--muted); font-size:.82rem; }
+  .lobby-slots[hidden] { display:none; }
+  .lobby-slots span { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:7px 10px; }
+  .lobby-box { width:min(390px,100%); display:grid; gap:14px; padding:18px; background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
+  .lobby-box h2 { margin:0; font-size:1.05rem; }
+  .lobby-box input { width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card2); color:var(--text); color-scheme:dark; font:inherit; }
+  .lobby-box input:focus { outline:2px solid var(--orange); }
+  .lobby-box input:-webkit-autofill,
+  .lobby-box input:-webkit-autofill:hover,
+  .lobby-box input:-webkit-autofill:focus,
+  .lobby-box input:autofill { -webkit-text-fill-color:var(--text); caret-color:var(--text); box-shadow:inset 0 0 0 1000px var(--card2); transition:background-color 99999s ease-out 0s; }
+  .lobby-actions { display:grid; gap:8px; }
+  .lobby-actions .btn { width:100%; padding:11px 16px; font-size:.95rem; }
+  .lobby-separator { color:var(--muted); font-size:.8rem; display:flex; align-items:center; gap:10px; }
+  .lobby-separator::before,.lobby-separator::after { content:""; height:1px; background:var(--line); flex:1; }
+  .room-code { font:900 1.7rem ui-monospace,monospace; letter-spacing:.18em; color:var(--orange); }
+  #waitingLobby[hidden] { display:none; }
+  .connection-chip { border:1px solid var(--line); border-radius:10px; padding:6px 10px; color:var(--muted); font-size:.78rem; }
+  .connection-chip.online { color:#9bd19f; border-color:#456949; }
+  .connection-chip.offline { color:#f0a097; border-color:#77413e; }
+  .reaction-toast { min-height:1.5em; text-align:center; color:var(--orange); font-weight:800; opacity:0; transform:translateY(4px); transition:opacity .2s,transform .2s; }
+  .reaction-toast.show { opacity:1; transform:translateY(0); }
+  .die.landed { animation:dieLand .26s ease-out; }
+  @keyframes dieLand { 0% { transform:translateY(-6px) scale(.97); } 72% { transform:translateY(1px) scale(1.015); } 100% { transform:translateY(0) scale(1); } }
+  .recap-row { padding:8px 0; border-bottom:1px solid var(--line); }
+  .recap-row:last-child { border-bottom:0; }
+  .recap-detail { color:var(--muted); font-size:.85rem; margin-top:4px; }
+  .badge-list { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; margin-top:12px; }
+  .achievement-badge { display:inline-block; padding:5px 9px; border-radius:999px; color:var(--text); background:var(--card2); border:1px solid var(--line); font-size:.78rem; }
+  .score-pop { animation:scorePop .38s ease-out; }
+  @keyframes scorePop { 0%{transform:scale(.94)} 55%{transform:scale(1.035)} 100%{transform:scale(1)} }
+
+  /* ---------- Spiel ---------- */
+  .game-wrap { max-width:1000px; margin:0 auto; }
+  .topbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:16px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip, .stat { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:8px 14px; font-weight:700; }
+  .chip.turn { border-color:var(--orange); box-shadow:0 0 14px rgba(255,122,26,.45); }
+  .stat small { display:block; color:var(--muted); font-size:.65rem; text-transform:uppercase; letter-spacing:.08em; }
+  .layout { display:grid; grid-template-columns:1fr 1.1fr; gap:16px; align-items:start; }
+  .card { background:var(--card); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow); border:1px solid var(--line); }
+  .banner { text-align:center; font-weight:800; font-size:1.2rem; color:var(--orange); margin-bottom:14px; }
+
+  /* ---------- Würfel ---------- */
+  .dice-area { min-height:130px; margin-bottom:8px; }
+  .dice-hidden { height:130px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:var(--muted); text-align:center; }
+  .dice-hidden .big { font-size:3rem; animation:float 3s ease-in-out infinite; }
+  .dice-row { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; padding:13px 10px 34px; border:1px solid rgba(255,255,255,.08); border-radius:18px;
+    background:radial-gradient(ellipse at 50% 0%,rgba(255,255,255,.055),transparent 72%),var(--dice-tray);
+    box-shadow:inset 0 3px 12px rgba(0,0,0,.32),0 8px 18px rgba(0,0,0,.14); perspective:900px; }
+  .die { aspect-ratio:1; width:100%; border:1px solid rgba(255,255,255,.72); border-radius:23%; padding:12%; position:relative; display:grid; grid-template:repeat(3,1fr)/repeat(3,1fr);
+    background:linear-gradient(145deg,rgba(255,255,255,.68),transparent 42%),linear-gradient(320deg,rgba(98,70,42,.12),transparent 52%),linear-gradient(145deg,var(--die-light),var(--die-face));
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.95),inset 0 -3px 6px rgba(61,43,27,.18),0 5px 0 var(--die-edge),0 8px 13px rgba(0,0,0,.38);
+    transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; transform-style:preserve-3d; }
+  .die .pip { border-radius:50%; background:radial-gradient(circle at 32% 27%,rgba(255,255,255,.24),transparent 34%),var(--die-pip); margin:12%;
+    box-shadow:inset 0 1px 2px rgba(255,255,255,.16),inset 0 -2px 3px rgba(0,0,0,.48),0 1px 1px rgba(255,255,255,.3); }
+  button.die:hover:not(:disabled):not(.rolling) { transform:translateY(-3px) rotate(-1deg); box-shadow:inset 0 1px 1px rgba(255,255,255,.95),inset 0 -3px 6px rgba(61,43,27,.18),0 7px 0 var(--die-edge),0 12px 16px rgba(0,0,0,.38); }
+  button.die:focus-visible { outline:3px solid var(--orange); outline-offset:4px; }
+  button.die:disabled { cursor:default; }
+  .die.held { border-color:rgba(255,255,255,.92); background:linear-gradient(145deg,rgba(255,255,255,.5),transparent 48%),linear-gradient(145deg,var(--die-held-top),var(--die-held-bottom));
+    box-shadow:0 5px 0 var(--die-held-edge),0 0 0 2px var(--orange),0 0 18px rgba(255,122,26,.32),inset 0 1px 1px rgba(255,255,255,.88),inset 0 -3px 6px rgba(72,35,14,.16); transform:translateY(3px) scale(.985); }
+  .die.held::after { content:"FEST"; position:absolute; left:0; right:0; bottom:-26px; text-align:center; font-size:.58rem; font-weight:850; letter-spacing:.12em; color:var(--orange); text-shadow:0 1px 6px rgba(0,0,0,.35); }
+  .die.rolling { animation:tumble .76s cubic-bezier(.2,.75,.25,1); transform-origin:center; }
+  @keyframes tumble { 0%{transform:perspective(500px) translateY(0) rotateX(0) rotateY(0) rotateZ(0) scale(1)} 28%{transform:perspective(500px) translateY(-9px) rotateX(14deg) rotateY(-18deg) rotateZ(58deg) scale(.96)} 68%{transform:perspective(500px) translateY(-3px) rotateX(-10deg) rotateY(12deg) rotateZ(245deg) scale(1.02)} 100%{transform:perspective(500px) translateY(0) rotateX(0) rotateY(0) rotateZ(360deg) scale(1)} }
+  .roll-info { display:flex; justify-content:space-between; align-items:center; margin:12px 0; color:var(--muted); }
+  .roll-dots { display:flex; gap:8px; }
+  .roll-dots i { width:14px; height:14px; border-radius:50%; background:var(--orange); box-shadow:0 0 10px var(--orange); }
+  .roll-dots i.used { background:var(--card2); box-shadow:none; }
+  #rollBtn { width:100%; }
+  .hint { min-height:2.6em; margin:12px 0 0; color:var(--muted); font-size:.9rem; text-align:center; }
+
+  /* ---------- Wertungsbogen ---------- */
+  .srow { display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:6px; margin-bottom:5px; align-items:center; }
+  .lbl { font-size:.9rem; }
+  .shead .cell { background:transparent; border:0; color:var(--muted); font-size:.8rem; padding:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .shead .cell.turn { color:var(--orange); }
+  .cell { background:var(--card2); border:1px solid transparent; border-radius:8px; padding:8px 4px; text-align:center; font-weight:800; min-height:36px; font-variant-numeric:tabular-nums; }
+  .cell:disabled { cursor:default; }
+  .cell.avail { border:1px dashed var(--orange); color:var(--orange); }
+  .cell.avail:hover { border-style:solid; background:#3a2a1c; transform:scale(1.04); }
+  .cell.used { background:transparent; border-color:var(--line); }
+  .srow.info { color:var(--muted); font-size:.85rem; }
+  .srow.info .cell { background:transparent; border:0; font-weight:600; }
+  .srow.total .cell { color:var(--orange); font-size:1.15rem; }
+  .sep { height:1px; background:var(--line); margin:8px 0; }
+
+  @media (max-width:760px) { .layout { grid-template-columns:1fr; } .card { padding:14px; } }
+  @media (prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
+  @media (max-width:760px) {
+    body::before, body::after { width:85vw; filter:blur(34px); opacity:.48; }
+  }
+#gearBtn { position:fixed; top:14px; right:14px; z-index:50; width:44px; height:44px; border-radius:50%; border:1px solid var(--line); background:var(--card); font-size:1.2rem; box-shadow:var(--shadow); cursor:pointer; }
+#gearBtn:hover { border-color:var(--orange); }
+#audioPanel { position:fixed; top:66px; right:14px; z-index:49; width:min(290px,calc(100vw - 28px)); background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; box-shadow:var(--shadow); display:block; opacity:0; visibility:hidden; transform:translateY(-8px) scale(.96); transform-origin:top right; transition:opacity .16s,transform .16s,visibility .16s; }
+#audioPanel::before { content:""; position:absolute; top:-7px; right:16px; width:12px; height:12px; background:var(--card); border-left:1px solid var(--line); border-top:1px solid var(--line); transform:rotate(45deg); }
+#audioPanel.open { opacity:1; visibility:visible; transform:translateY(0) scale(1); }
+#audioPanel label { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:10px 0 4px; font-size:.9rem; color:var(--muted); }
+#audioPanel input[type=range] { width:100%; accent-color:var(--orange); }
+#audioPanel input[type=checkbox] { accent-color:var(--orange); width:18px; height:18px; }
+#audioPanel select { background:var(--card2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px; font:inherit; }
+#kEgg { user-select:none; }
+#scare { position:fixed; inset:0; z-index:9999; background:#000; display:none; align-items:center; justify-content:center; cursor:pointer; }
+#scare.on { display:flex; animation:scareFlash .5s steps(2) 4; }
+#scare .face { font-size:55vmin; animation:scarePop .3s ease-out, scareShake .08s linear .3s infinite; }
+@keyframes scarePop { from { transform:scale(.1); } to { transform:scale(1); } }
+@keyframes scareShake { 0% { transform:translate(-8px,4px) scale(1.05); } 50% { transform:translate(8px,-4px) scale(1.1); } 100% { transform:translate(-4px,-6px) scale(1.05); } }
+@keyframes scareFlash { 0% { background:#b00; } 50% { background:#000; } }
+
+</style>
+</head>
+<body>
+
+<!-- ===== Startbildschirm ===== -->
+<section id="start" class="screen active">
+  <div class="spooky" id="themeDecor"><span>🦇</span><span>🎃</span><span>👻</span></div>
+  <h1 class="title"><span id="kEgg">K</span>niffel</h1>
+  <section class="lobby-box" id="roomControls">
+    <h2>Neuen Raum erstellen</h2>
+    <input id="name0" maxlength="14" placeholder="Dein Name" autocomplete="nickname">
+    <div class="lobby-actions"><button class="btn" id="createRoomBtn">Raum erstellen</button></div>
+    <div class="lobby-separator">oder beitreten</div>
+    <input id="roomCodeInput" maxlength="6" placeholder="6-stelliger Raumcode" autocomplete="off" style="text-transform:uppercase;letter-spacing:.12em;text-align:center">
+    <div class="lobby-actions"><button class="btn ghost" id="joinRoomBtn">Raum beitreten</button></div>
+  </section>
+  <p class="hint" id="lobbyMsg"></p>
+  <div class="lobby-status"><span class="status-dot" id="connectionDot"></span><span id="connectionText">Prüfe Verbindung …</span></div>
+  <div class="lobby-slots" id="roomSlots" hidden><span id="lobbySlot0">Spieler 1 · Platz frei</span><span id="lobbySlot1">Spieler 2 · Platz frei</span></div>
+  <section class="lobby-box" id="waitingLobby" hidden>
+    <h2>Dein Raumcode</h2><div class="room-code" id="roomCodeDisplay"></div>
+    <button class="btn ghost" id="copyRoomCodeBtn">Code kopieren</button>
+    <p class="hint">Teile den Code mit deinem Mitspieler. Zum Beitreten wird kein Passwort benötigt.</p>
+    <button class="btn ghost" id="leaveLobbyBtn">Raum verlassen</button>
+  </section>
+</section>
+
+<!-- ===== Spielbildschirm ===== -->
+<section id="game" class="screen">
+  <div class="game-wrap">
+    <div class="topbar">
+      <div class="stat"><small>Runde</small><span id="roundLabel">1 / 13</span></div>
+      <div class="chips"><div class="chip" id="chip0"></div><div class="chip" id="chip1"></div></div>
+      <span class="connection-chip" id="gameConnection">Verbinde …</span>
+      <button class="btn ghost" id="restartBtn">Neustart</button>
+      <button class="btn ghost" id="leaveGameBtn">Raum verlassen</button>
+    </div>
+    <div class="layout">
+      <div class="card">
+        <div class="banner" id="turnBanner"></div>
+        <div class="dice-area" id="diceArea"></div>
+        <div class="roll-info"><span id="rollsText"></span><span class="roll-dots" id="rollDots"></span></div>
+        <button class="btn" id="rollBtn">Würfeln</button>
+        <p class="hint" id="hint"></p>
+        <div class="reaction-toast" id="reactionToast" aria-live="polite"></div>
+      </div>
+      <div class="card" id="sheet"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Abschlussbildschirm ===== -->
+<section id="end" class="screen">
+  <div class="spooky" id="endDecor"><span>🏆</span></div>
+  <div class="winner" id="winnerText"></div>
+  <div class="summary" id="finalSummary"></div>
+  <div class="badge-list" id="achievementSummary" aria-live="polite"></div>
+  <div class="end-buttons">
+    <button class="btn" id="againBtn">Nochmal spielen</button>
+    <button class="btn ghost" id="menuBtn">Hauptmenü</button>
+  </div>
+</section>
+<button id="gearBtn" title="Einstellungen" aria-label="Einstellungen">⚙️</button>
+<div id="audioPanel" aria-label="Einstellungen">
+  <label><span>Hintergrundmusik</span><input type="checkbox" id="musicOn"></label>
+  <label><span>Titel</span><select id="trackSel"></select></label>
+  <label><span>Musik-Lautstärke</span></label>
+  <input type="range" id="musicVol" min="0" max="100">
+  <label><span>Effekt-Lautstärke</span></label>
+  <input type="range" id="sfxVol" min="0" max="100">
+</div>
+<div id="scare"><div class="face">💀</div></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+/* ===== Sound (Web Audio, alles synthetisch, keine Dateien) ===== */
+const Sound = (() => {
+  const KEY = "kniffelAudio";
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+  const s = Object.assign({ musicOn: true, music: 0.25, sfx: 0.6, track: 0 }, stored);
+  let ctx = null, musicGain, sfxGain, noiseBuf, timer = null, step = 0, next = 0;
+
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} };
+  const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+  const fade = (g, v) => g.gain.setTargetAtTime(v, ctx.currentTime, 0.08);
+
+  // Ein Ton mit weichem Ein- und Ausklang
+  function tone(type, f, t, dur, vol, dest, att = 0.015) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + att);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  // Kurzer Rauschstoß (Würfel-Klackern)
+  function noise(t, dur, f, vol, dest) {
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf;
+    const fl = ctx.createBiquadFilter(); fl.type = "bandpass"; fl.frequency.value = f; fl.Q.value = 1.2;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(fl); fl.connect(g); g.connect(dest);
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+  }
+  const note = (type, midi, t, dur, vol, att) => tone(type, hz(midi), t, dur, vol, musicGain, att);
+
+  /* ---- Musikstücke (alle selbst komponiert, Achtel-Schritte) ---- */
+  const WALTZ_MELODY = [69,0,72,0,76,0, 74,0,72,0,69,0, 71,0,68,0,71,0, 72,0,69,0,0,0,
+                        74,0,77,0,74,0, 72,0,76,0,72,0, 71,0,68,0,64,0, 69,0,0,0,0,0];
+  const TRACKS = [
+    { name: "Kürbis-Walzer", bpm: 140, steps: 48, play(i, t, d) {
+      const A = [57,60,64], E = [52,56,59], D = [50,53,57];
+      const c = [A, A, E, A, D, A, E, A][Math.floor(i / 6)], p = i % 6;
+      if (p === 0) note("triangle", c[0] - 12, t, d * 1.8, 0.7);
+      if (p === 2 || p === 4) c.forEach(n => note("sine", n, t, d * 1.5, 0.2));
+      if (WALTZ_MELODY[i]) note("triangle", WALTZ_MELODY[i], t, d * 1.9, 0.45);
+    }},
+  ];
+  if (!TRACKS[s.track]) s.track = 0;
+
+  function schedule() {
+    const tr = TRACKS[s.track], d = 60 / tr.bpm / 2;
+    while (next < ctx.currentTime + 0.3) { tr.play(step % tr.steps, next, d); next += d; step++; }
+  }
+  function startMusic() {
+    if (!ctx || timer) return;
+    step = 0; next = ctx.currentTime + 0.1;
+    fade(musicGain, s.music * 0.35);
+    timer = setInterval(schedule, 100);
+  }
+  function stopMusic() {
+    if (timer) { clearInterval(timer); timer = null; }
+    if (ctx) fade(musicGain, 0);
+  }
+
+  function init() {
+    if (ctx) { if (ctx.state === "suspended") ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ctx = new AC();
+    const comp = ctx.createDynamicsCompressor(); comp.connect(ctx.destination);   // begrenzt Lautstärkespitzen
+    musicGain = ctx.createGain(); sfxGain = ctx.createGain();
+    musicGain.connect(comp); sfxGain.connect(comp);
+    musicGain.gain.value = s.musicOn ? s.music * 0.35 : 0;
+    sfxGain.gain.value = s.sfx;
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const data = noiseBuf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    if (s.musicOn) startMusic();
+  }
+
+  const ready = () => ctx && s.sfx > 0;
+  return {
+    settings: s, trackNames: TRACKS.map(t => t.name), init,
+    setMusicOn(b) { s.musicOn = b; save(); if (ctx) b ? startMusic() : stopMusic(); },
+    setMusicVol(v) { s.music = v; save(); if (ctx && s.musicOn) fade(musicGain, v * 0.35); },
+    setSfxVol(v) { s.sfx = v; save(); if (ctx) fade(sfxGain, v); },
+    setTrack(i) { s.track = i; save(); step = 0; if (ctx) next = ctx.currentTime + 0.1; },
+    roll(vol = 1) {                       // weiches Rollen mit kurzem, gedämpftem Würfelklack
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      const base = 820;
+      for (let i = 0; i < 7; i++) {
+        const at = t + i * 0.052 + Math.random() * 0.018;
+        const strength = (0.105 - i * 0.008) * vol;
+        noise(at, 0.045, base + Math.random() * 500, strength, sfxGain);
+        tone("sine", 125, at, 0.045, 0.024 * vol, sfxGain);
+      }
+    },
+    land() {
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      noise(t, 0.055, 760, 0.075, sfxGain);
+      tone("sine", 132, t, 0.095, 0.055, sfxGain);
+    },
+    turn() {                              // sanfter Gong: du bist dran
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      tone("sine", 587.33, t, 0.5, 0.22, sfxGain);
+      tone("sine", 880, t + 0.12, 0.6, 0.16, sfxGain);
+    },
+    score() {
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      tone("triangle", 330, t, 0.25, 0.25, sfxGain);
+      tone("triangle", 247, t + 0.1, 0.3, 0.2, sfxGain);
+    },
+    yahtzee() {
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      [76, 79, 83].forEach((m, i) =>
+        tone("sine", hz(m), t + i * 0.11, 0.72, 0.14, sfxGain));
+    },
+    end() {
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      [57, 60, 64, 69].forEach((m, i) => tone("triangle", hz(m), t + i * 0.15, 0.7, 0.25, sfxGain));
+    },
+    scare() {
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(300, t); o.frequency.exponentialRampToValueAtTime(1800, t + 0.35);
+      g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+      o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 1);
+      noise(t, 0.7, 2500, 0.8, sfxGain);
+      tone("sine", 60, t, 0.8, 0.9, sfxGain);
+    }
+  };
+})();
+
+/* ===== 1. Konfiguration ===== */
+const CATEGORIES = [
+  { id:"ones",   label:"Einser",  block:"upper", face:1 },
+  { id:"twos",   label:"Zweier",  block:"upper", face:2 },
+  { id:"threes", label:"Dreier",  block:"upper", face:3 },
+  { id:"fours",  label:"Vierer",  block:"upper", face:4 },
+  { id:"fives",  label:"Fünfer",  block:"upper", face:5 },
+  { id:"sixes",  label:"Sechser", block:"upper", face:6 },
+  { id:"threeKind", label:"Dreierpasch", block:"lower" },
+  { id:"fourKind",  label:"Viererpasch", block:"lower" },
+  { id:"fullHouse", label:"Full House", block:"lower" },
+  { id:"smallStraight", label:"Kleine Straße", block:"lower" },
+  { id:"largeStraight", label:"Große Straße", block:"lower" },
+  { id:"yahtzee", label:"Kniffel", block:"lower" },
+  { id:"chance",  label:"Chance", block:"lower" }
+];
+const TOTAL_ROUNDS = 13, MAX_ROLLS = 3, BONUS_THRESHOLD = 63, BONUS_POINTS = 35, ROLL_MS = 760, POLL_MS = 300;
+const PIP_LAYOUT = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
+
+/* ===== 2. Wertungslogik (reine Funktionen) ===== */
+function calculateScore(categoryId, dice) {
+  const counts = [0,0,0,0,0,0,0];
+  dice.forEach(d => counts[d]++);
+  const sum = dice.reduce((a, b) => a + b, 0);
+  const maxCount = Math.max(...counts);
+  const cat = CATEGORIES.find(c => c.id === categoryId);
+  if (cat.block === "upper") return counts[cat.face] * cat.face;
+  const has = run => run.every(f => counts[f] > 0);
+  switch (categoryId) {
+    case "threeKind": return maxCount >= 3 ? sum : 0;
+    case "fourKind":  return maxCount >= 4 ? sum : 0;
+    case "fullHouse": return counts.slice(1).filter(n => n > 0).sort().join("") === "23" ? 25 : 0;
+    case "smallStraight": return [[1,2,3,4],[2,3,4,5],[3,4,5,6]].some(has) ? 30 : 0;
+    case "largeStraight": return [[1,2,3,4,5],[2,3,4,5,6]].some(has) ? 40 : 0;
+    case "yahtzee": return maxCount === 5 ? 50 : 0;
+    case "chance":  return sum;
+  }
+  return 0;
+}
+
+function calculateTotals(scores) {
+  let upper = 0, lower = 0;
+  CATEGORIES.forEach(c => {
+    if (scores[c.id] === null) return;
+    if (c.block === "upper") upper += scores[c.id]; else lower += scores[c.id];
+  });
+  const bonus = upper >= BONUS_THRESHOLD ? BONUS_POINTS : 0;
+  return { upper, lower, bonus, total: upper + bonus + lower };
+}
+
+/* ===== 3. Zustand ===== */
+let playerNames = ["Spieler 1", "Spieler 2"];
+let state = null;        // aktueller Spielstand (kommt vom Server)
+let mySeat = null;       // 0 = Spieler 1, 1 = Spieler 2
+let roomId = null;
+let seatToken = null;
+let lastVersion = -1;    // zuletzt übernommene Server-Version
+let sheetBuilt = false;
+let polling = false;
+let pushQueue = Promise.resolve();
+let seenRollId = 0;      // zuletzt gesehener Wurf des Gegners
+let wasMyTurn = false;
+let reactionTimer = null, finishedGameId = null;
+let diceFaceInterval = null, diceMotionTimeout = null;
+const PLAYER_STATS_KEY = "kniffelPlayerStatsV1", RECORDED_GAMES_KEY = "kniffelRecordedGamesV1", GAME_ID_KEY = "kniffelGameId";
+function createGameId() { return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10); }
+let currentGameId = "";
+try {
+  currentGameId = sessionStorage.getItem(GAME_ID_KEY) || createGameId();
+  sessionStorage.setItem(GAME_ID_KEY, currentGameId);
+} catch (e) { currentGameId = createGameId(); }
+function startNewLocalGameRecord() {
+  currentGameId = createGameId();
+  finishedGameId = null;
+  try { sessionStorage.setItem(GAME_ID_KEY, currentGameId); } catch (e) {}
+}
+
+try {
+  const s = sessionStorage.getItem("kniffelSeat"); if (s !== null) mySeat = Number(s);
+  roomId = sessionStorage.getItem("kniffelRoomId");
+  seatToken = sessionStorage.getItem("kniffelSeatToken");
+} catch (e) {}
+
+const hasRolled = () => state.rollsLeft < MAX_ROLLS;
+const isMyTurn = () => state !== null && !state.over && state.current === mySeat;
+const randomDie = () => Math.floor(Math.random() * 6) + 1;
+
+function showReaction(message) {
+  const toast = $("reactionToast");
+  if (!toast) return;
+  clearTimeout(reactionTimer);
+  toast.textContent = message;
+  toast.classList.add("show");
+  reactionTimer = setTimeout(() => toast.classList.remove("show"), 1500);
+}
+function finishDiceAnimation(dice, indices, rollId) {
+  state.landedIdx = new Set(indices);
+  if (indices.length && dice.length === 5 && dice.every(value => value > 0 && value === dice[0])) {
+    showReaction("✨ Kniffel! Alle fünf Würfel zeigen " + dice[0] + ".");
+    Sound.yahtzee();
+  } else if (indices.length) {
+    Sound.land();
+  }
+  setTimeout(() => {
+    if (!state || state.rollId !== rollId) return;
+    state.landedIdx.clear();
+    render();
+  }, 720);
+}
+
+function stopDiceMotionTimers() {
+  if (diceFaceInterval !== null) clearInterval(diceFaceInterval);
+  if (diceMotionTimeout !== null) clearTimeout(diceMotionTimeout);
+  diceFaceInterval = null;
+  diceMotionTimeout = null;
+}
+
+function startDiceMotion(indices, rollId) {
+  stopDiceMotionTimers();
+  if (!indices.length) {
+    state.rollingIdx = new Set();
+    state.busy = false;
+    render();
+    return;
+  }
+  const rolling = new Set(indices);
+  diceFaceInterval = setInterval(() => {
+    if (!state || state.rollId !== rollId) { stopDiceMotionTimers(); return; }
+    state.shown = state.dice.map((value, i) => rolling.has(i) ? randomDie() : value);
+    updateRollingDieFaces();
+  }, 85);
+  diceMotionTimeout = setTimeout(() => {
+    if (!state || state.rollId !== rollId) { stopDiceMotionTimers(); return; }
+    stopDiceMotionTimers();
+    state.shown = [...state.dice];
+    state.rollingIdx = new Set();
+    state.busy = false;
+    finishDiceAnimation(state.dice, indices, rollId);
+    render();
+  }, ROLL_MS);
+}
+
+function applyGame(g) {
+  state = { players: g.players, current: g.current, round: g.round, dice: g.dice, held: g.held,
+            rollsLeft: g.rollsLeft, over: g.over, rolling: g.rolling || [], rollId: g.rollId || 0,
+            busy: false, rollingIdx: new Set(), landedIdx: new Set(), shown: [...g.dice] };
+}
+function resetTurn() {
+  state.dice = [0,0,0,0,0]; state.shown = [0,0,0,0,0];
+  state.held = [false,false,false,false,false]; state.rollsLeft = MAX_ROLLS; state.rolling = [];
+}
+
+/* ===== 4. Server-Verbindung ===== */
+async function api(path, body) {
+  const options = body === undefined ? {} :
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const res = await fetch(path, options);
+  return { ok: res.ok, data: await res.json() };
+}
+
+function setConnectionStatus(online, text) {
+  const dot = $("connectionDot"), copy = $("connectionText"), game = $("gameConnection");
+  if (dot) dot.className = "status-dot " + (online ? "online" : "offline");
+  if (copy) copy.textContent = text;
+  if (game) { game.textContent = online ? "Verbunden" : "Verbindung wird gesucht …"; game.className = "connection-chip " + (online ? "online" : "offline"); }
+}
+function updateLobbySlots(names = []) {
+  [0, 1].forEach(i => {
+    const name = names[i];
+    $("lobbySlot" + i).textContent = "Spieler " + (i + 1) + " · " + (name || "Warte auf Mitspieler");
+  });
+}
+
+function saveRoomSession() {
+  try {
+    sessionStorage.setItem("kniffelSeat", mySeat);
+    sessionStorage.setItem("kniffelRoomId", roomId);
+    sessionStorage.setItem("kniffelSeatToken", seatToken);
+  } catch (e) {}
+}
+
+// Eigenen Zug an den Server melden
+async function push() {
+  const game = JSON.parse(JSON.stringify({
+    players: state.players, current: state.current, round: state.round, dice: state.dice,
+    held: state.held, rollsLeft: state.rollsLeft, over: state.over,
+    rolling: state.rolling, rollId: state.rollId
+  }));
+  const send = async () => {
+    try {
+      const { ok, data } = await api("/api/move", { roomId, seat: mySeat, token: seatToken, version: lastVersion, game });
+      lastVersion = ok ? data.version : -1;
+    } catch (e) { lastVersion = -1; }
+  };
+  pushQueue = pushQueue.then(send, send);
+  return pushQueue;
+}
+
+function enterRoom(data) {
+  mySeat = data.seat; roomId = data.roomId; seatToken = data.token; lastVersion = -1;
+  saveRoomSession();
+  startNewLocalGameRecord();
+  $("roomControls").hidden = true;
+  $("waitingLobby").hidden = false;
+  $("roomSlots").hidden = false;
+  $("roomCodeDisplay").textContent = roomId;
+  $("lobbyMsg").textContent = "Warte auf deinen Mitspieler …";
+  setConnectionStatus(true, "Du bist Spieler " + (mySeat + 1) + " · warte auf Mitspieler");
+}
+
+async function createRoom() {
+  try {
+    const { ok, data } = await api("/api/create", { name: $("name0").value.trim() });
+    if (!ok) { $("lobbyMsg").textContent = data.error || "Raum konnte nicht erstellt werden."; return; }
+    enterRoom(data);
+  } catch (e) { $("lobbyMsg").textContent = "Server nicht erreichbar. Bitte später erneut versuchen."; setConnectionStatus(false, "Server nicht erreichbar"); }
+}
+
+async function joinRoom() {
+  try {
+    const { ok, data } = await api("/api/join", {
+      roomId: $("roomCodeInput").value.trim().toUpperCase(),
+      name: $("name0").value.trim()
+    });
+    if (!ok) { $("lobbyMsg").textContent = data.error || "Beitreten nicht möglich."; return; }
+    enterRoom(data);
+  } catch (e) { $("lobbyMsg").textContent = "Server nicht erreichbar. Bitte später erneut versuchen."; setConnectionStatus(false, "Server nicht erreichbar"); }
+}
+
+function leaveToStart(message = "") {
+  mySeat = null; state = null; roomId = null; seatToken = null; lastVersion = -1;
+  try { ["kniffelSeat", "kniffelRoomId", "kniffelSeatToken"].forEach(key => sessionStorage.removeItem(key)); } catch (e) {}
+  $("roomControls").hidden = false;
+  $("waitingLobby").hidden = true;
+  $("roomSlots").hidden = true;
+  updateLobbySlots([null, null]);
+  $("lobbyMsg").textContent = message;
+  setConnectionStatus(true, "Erstelle einen Raum oder tritt mit Code bei");
+  showScreen("start");
+}
+
+async function leaveRoom(message = "") {
+  if (roomId && mySeat !== null && seatToken) {
+    try { await api("/api/leave", { roomId, seat: mySeat, token: seatToken }); } catch (e) {}
+  }
+  leaveToStart(message);
+}
+
+async function poll() {
+  if (polling || mySeat === null) return;
+  polling = true;
+  try {
+    const { ok, data } = await api("/api/state", { roomId, seat: mySeat, token: seatToken });
+    if (!ok) { leaveToStart(data.error || "Der Raum wurde geschlossen."); polling = false; return; }
+    setConnectionStatus(true, "Spielserver erreichbar");
+    document.title = "Kniffel – Halloween";
+    handleServerState(data);
+  } catch (e) { document.title = "⚠ Verbindung weg – Kniffel"; setConnectionStatus(false, "Verbindung unterbrochen · erneuter Versuch läuft"); }
+  polling = false;
+}
+
+function handleServerState(d) {
+  if (d.names[mySeat] === null) { leaveToStart("Der Raum wurde geschlossen."); return; }
+  playerNames = d.names.map((n, i) => n || "Spieler " + (i + 1));
+  updateLobbySlots(d.names);
+  if (!d.game) { $("lobbyMsg").textContent = "Warte auf Mitspieler …"; return; }
+  if (d.version <= lastVersion || (state && state.busy)) return;  // nichts Neues
+  const firstSync = lastVersion === -1;
+  lastVersion = d.version;
+  applyGame(d.game);
+  if (!sheetBuilt) { buildSheet(); sheetBuilt = true; }
+  if (state.over) {
+    finishGame();
+  } else {
+    showScreen("game");
+    render();
+    // Neuer Wurf des Gegners: Animation live abspielen
+    const newRoll = !firstSync && state.rollId !== seenRollId && state.rolling.length > 0 && state.current !== mySeat;
+    if (newRoll) playRemoteRoll(state.rolling);
+  }
+  seenRollId = state.rollId;
+  const nowMyTurn = isMyTurn();      
+  if (nowMyTurn && !wasMyTurn) Sound.turn();   
+  wasMyTurn = nowMyTurn;             
+}
+
+/* ===== 5. Aktionen (nur für den Spieler am Zug) ===== */
+function rollDice() {
+  if (!isMyTurn() || state.busy || state.rollsLeft <= 0) return;
+  state.busy = true;
+  if (state.rollsLeft === MAX_ROLLS) state.held.fill(false);
+  const finalDice = state.dice.map((v, i) => (state.held[i] && v > 0) ? v : randomDie());
+  const rolling = state.held.map((h, i) => h ? -1 : i).filter(i => i >= 0);
+  if (rolling.length) Sound.roll();
+  state.rollingIdx = new Set(rolling);
+  state.landedIdx.clear();
+  state.dice = finalDice;                  // Endwerte stehen sofort fest
+  state.rolling = rolling;
+  state.rollId++;
+  const rollId = state.rollId;
+  state.rollsLeft--;
+  state.shown = state.dice.map((value, i) => state.rollingIdx.has(i) ? randomDie() : value);
+  push();                                  // Gegner sieht den Wurf sofort
+  render();
+  startDiceMotion(rolling, rollId);
+}
+// Spielt den Wurf des Gegners ab (nur Anzeige, die Endwerte stehen schon im Zustand)
+function playRemoteRoll(indices) {
+  if (indices.length) Sound.roll(0.6);
+  state.busy = true;
+  state.rollingIdx = new Set(indices);
+  state.landedIdx.clear();
+  state.shown = state.dice.map((value, i) => state.rollingIdx.has(i) ? randomDie() : value);
+  const rollId = state.rollId;
+  render();
+  startDiceMotion(indices, rollId);
+}
+
+function toggleHold(index) {
+  if (!isMyTurn() || state.busy || !hasRolled() || state.rollsLeft === 0) return;
+  state.held[index] = !state.held[index];
+  render();
+  push();
+}
+
+function scoreCategory(playerIndex, categoryId) {
+  if (!isMyTurn() || playerIndex !== mySeat || state.busy || !hasRolled()) return;
+  const scores = state.players[playerIndex].scores;
+  if (scores[categoryId] !== null) return;
+  Sound.score();
+  scores[categoryId] = calculateScore(categoryId, state.dice);
+  if (state.current === 1) state.round++;
+  if (state.round > TOTAL_ROUNDS) { state.over = true; push(); finishGame(); return; }
+  state.current = 1 - state.current;
+  resetTurn();
+  render();
+  const scoredCell = $("c-" + playerIndex + "-" + categoryId);
+  scoredCell.classList.remove("score-pop");
+  void scoredCell.offsetWidth;
+  scoredCell.classList.add("score-pop");
+  push();
+}
+
+function finishGame() {
+  if (finishedGameId === currentGameId) return;
+  finishedGameId = currentGameId;
+  Sound.end(); 
+  const t = state.players.map(p => calculateTotals(p.scores));
+  const winningIndex = getWinningIndex(t);
+  updateWinnerText(t, winningIndex);
+  const record = recordFinishedGame(t, winningIndex);
+  const box = $("finalSummary");
+  box.innerHTML = "";
+  t.forEach((tot, i) => {
+    const scores = state.players[i].scores;
+    const bestCategory = CATEGORIES.filter(c => scores[c.id] !== null).sort((a,b) => scores[b.id] - scores[a.id])[0];
+    const d = document.createElement("div"); d.className = "recap-row";
+    const b = document.createElement("b");
+    b.textContent = playerNames[i] + ": " + tot.total;
+    d.appendChild(b);
+    d.appendChild(document.createElement("br"));
+    d.appendChild(document.createTextNode("Oben " + tot.upper + " · Bonus " + tot.bonus + " · Unten " + tot.lower));
+    const detail = document.createElement("div"); detail.className = "recap-detail";
+    detail.textContent = "Topwertung: " + (bestCategory ? bestCategory.label + " · " + scores[bestCategory.id] + " Punkte" : "–")
+      + (scores.yahtzee >= 50 ? " · Kniffel erzielt" : "")
+      + " · " + (record.stats[playerNames[i]]?.wins || 0) + " Siege in " + (record.stats[playerNames[i]]?.games || 0) + " Partien";
+    d.appendChild(detail);
+    box.appendChild(d);
+  });
+  const badgeBox = $("achievementSummary"); badgeBox.replaceChildren();
+  let shownBadges = 0;
+  record.newBadges.forEach((badges, i) => badges.forEach(label => {
+    const badge = document.createElement("span"); badge.className = "achievement-badge";
+    badge.textContent = "🏅 " + playerNames[i] + " · " + label;
+    badgeBox.appendChild(badge); shownBadges++;
+  }));
+  if (!shownBadges) {
+    const message = document.createElement("span"); message.className = "achievement-badge";
+    message.textContent = "Weiter so – der nächste kleine Erfolg wartet schon.";
+    badgeBox.appendChild(message);
+  }
+  $("end").classList.remove("score-pop");
+  void $("end").offsetWidth;
+  $("end").classList.add("score-pop");
+  showScreen("end");
+}
+
+function getWinningIndex(totals) {
+  return totals[0].total === totals[1].total ? -1 : (totals[0].total > totals[1].total ? 0 : 1);
+}
+function updateWinnerText(totals, winningIndex = getWinningIndex(totals)) {
+  $("winnerText").textContent = winningIndex < 0 ? "Unentschieden!"
+    : "🎃 " + playerNames[winningIndex] + " gewinnt!";
+}
+
+function recordFinishedGame(totals, winningIndex) {
+  const newBadges = [[], []];
+  let stats = {};
+  try {
+    const recorded = JSON.parse(localStorage.getItem(RECORDED_GAMES_KEY) || "[]");
+    stats = JSON.parse(localStorage.getItem(PLAYER_STATS_KEY) || "{}");
+    if (recorded.includes(currentGameId)) return { newBadges, stats };
+    totals.forEach((tot, i) => {
+      const name = playerNames[i], scorecard = state.players[i].scores;
+      const profile = stats[name] || { games:0, wins:0, draws:0, kniffels:0, bonusGames:0, best:0, streak:0, badges:[] };
+      const previousBest = profile.best;
+      profile.games++;
+      if (winningIndex === i) { profile.wins++; profile.streak++; }
+      else if (winningIndex < 0) { profile.draws++; profile.streak = 0; }
+      else profile.streak = 0;
+      if (scorecard.yahtzee >= 50) profile.kniffels++;
+      if (tot.bonus) profile.bonusGames++;
+      profile.best = Math.max(previousBest, tot.total);
+      const earned = [];
+      if (profile.wins === 1) earned.push("Erster Sieg");
+      if (profile.kniffels === 1 && scorecard.yahtzee >= 50) earned.push("Erster Kniffel");
+      if (profile.bonusGames === 1 && tot.bonus) earned.push("Bonusjäger");
+      if (previousBest < 300 && tot.total >= 300) earned.push("Punktejäger");
+      if (profile.streak === 3) earned.push("Seriensieger");
+      profile.badges = profile.badges || [];
+      earned.forEach(badge => { if (!profile.badges.includes(badge)) { profile.badges.push(badge); newBadges[i].push(badge); } });
+      stats[name] = profile;
+    });
+    recorded.push(currentGameId);
+    localStorage.setItem(RECORDED_GAMES_KEY, JSON.stringify(recorded.slice(-100)));
+    localStorage.setItem(PLAYER_STATS_KEY, JSON.stringify(stats));
+  } catch (e) { /* storage can be unavailable in private browsing */ }
+  return { newBadges, stats };
+}
+function setTheme() {
+  document.body.dataset.theme = "halloween";
+  $("themeDecor").innerHTML = "<span>🦇</span><span>🎃</span><span>👻</span>";
+  $("endDecor").innerHTML = "<span>🏆</span>";
+  $("scare").querySelector(".face").textContent = "💀";
+  document.title = "Kniffel – Halloween";
+  try { localStorage.setItem("kniffelTheme", "halloween"); } catch (e) {}
+  const trackSelect = $("trackSel");
+  trackSelect.replaceChildren();
+  Sound.trackNames.forEach((name, index) => {
+    trackSelect.add(new Option(name, index));
+  });
+  trackSelect.value = Sound.settings.track;
+  if (state && !state.over) render();
+  else if (state?.over) updateWinnerText(state.players.map(p => calculateTotals(p.scores)));
+}
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
+}
+
+/* ===== 6. Darstellung ===== */
+function createDieElement(value, tag) {
+  const el = document.createElement(tag);
+  el.className = "die";
+  const pips = PIP_LAYOUT[value] || [];
+  for (let i = 0; i < 9; i++) {
+    const s = document.createElement("span");
+    if (pips.includes(i)) s.className = "pip";
+    el.appendChild(s);
+  }
+  return el;
+}
+
+function updateRollingDieFaces() {
+  if (!state) return;
+  state.rollingIdx.forEach(i => {
+    const die = $("diceArea").querySelector(`[data-die-index="${i}"]`);
+    if (!die) return;
+    const pips = PIP_LAYOUT[state.shown[i]] || [];
+    Array.from(die.children).forEach((pip, index) => pip.classList.toggle("pip", pips.includes(index)));
+    die.setAttribute("aria-label", "Würfel " + (i + 1) + ": " + state.shown[i]);
+  });
+}
+
+function buildSheet() {
+  const sheet = $("sheet");
+  sheet.innerHTML = "";
+  const addRow = (cls, label, cells) => {
+    const row = document.createElement("div");
+    row.className = "srow " + cls;
+    const l = document.createElement("span");
+    l.className = "lbl"; l.textContent = label;
+    row.appendChild(l);
+    cells.forEach(c => row.appendChild(c));
+    sheet.appendChild(row);
+  };
+  const textCell = id => { const s = document.createElement("span"); s.className = "cell"; s.id = id; return s; };
+  const catRows = block => CATEGORIES.filter(c => c.block === block).forEach(cat =>
+    addRow("", cat.label, [0, 1].map(p => {
+      const b = document.createElement("button");
+      b.className = "cell"; b.id = "c-" + p + "-" + cat.id;
+      b.addEventListener("click", () => scoreCategory(p, cat.id));
+      return b;
+    })));
+  const addSep = () => { const s = document.createElement("div"); s.className = "sep"; sheet.appendChild(s); };
+
+  addRow("shead", "", [textCell("head-0"), textCell("head-1")]);
+  catRows("upper");
+  addRow("info", "Summe oben (Bonus ab " + BONUS_THRESHOLD + ")", [textCell("up-0"), textCell("up-1")]);
+  addRow("info", "Bonus (+" + BONUS_POINTS + ")", [textCell("bo-0"), textCell("bo-1")]);
+  addSep();
+  catRows("lower");
+  addSep();
+  addRow("info total", "Gesamt", [textCell("tot-0"), textCell("tot-1")]);
+}
+
+function render() {
+  const totals = state.players.map(p => calculateTotals(p.scores));
+  const myTurn = isMyTurn();
+  $("roundLabel").textContent = Math.min(state.round, TOTAL_ROUNDS) + " / " + TOTAL_ROUNDS;
+  [0, 1].forEach(p => {
+    $("chip" + p).textContent = playerNames[p] + ": " + totals[p].total;
+    $("chip" + p).classList.toggle("turn", p === state.current);
+  });
+  $("turnBanner").textContent = myTurn ? "🎃 " + playerNames[mySeat] + ", du bist dran"
+                                       : "👻 " + playerNames[state.current] + " ist dran …";
+
+  // Würfel erst nach dem ersten Wurf sichtbar
+  const area = $("diceArea");
+  area.innerHTML = "";
+  if (!hasRolled()) {
+    area.innerHTML = '<div class="dice-hidden"><div class="big">🎃</div><div>Die Würfel liegen noch im Dunkeln …</div></div>';
+  } else {
+    const row = document.createElement("div");
+    row.className = "dice-row";
+    state.shown.forEach((value, i) => {
+      const die = createDieElement(value, "button");
+      die.dataset.dieIndex = i;
+      die.setAttribute("aria-label", "Würfel " + (i + 1) + ": " + value);
+      if (state.held[i]) die.classList.add("held");
+      if (state.rollingIdx.has(i)) die.classList.add("rolling");
+      if (state.landedIdx.has(i)) die.classList.add("landed");
+      die.disabled = !myTurn || state.busy || state.rollsLeft === 0;
+      die.addEventListener("click", () => toggleHold(i));
+      row.appendChild(die);
+    });
+    area.appendChild(row);
+  }
+
+  $("rollsText").textContent = "Würfe übrig: " + state.rollsLeft;
+  $("rollDots").innerHTML = Array.from({ length: MAX_ROLLS }, (_, i) =>
+    '<i class="' + (i < state.rollsLeft ? "" : "used") + '"></i>').join("");
+  $("rollBtn").disabled = !myTurn || state.busy || state.rollsLeft === 0;
+  $("hint").textContent = !myTurn ? "Warte auf " + playerNames[state.current] + " …"
+    : !hasRolled() ? "Würfle, um deinen Zug zu beginnen."
+    : state.rollsLeft === 0 ? "Keine Würfe mehr – trage eine Wertung ein."
+    : "Würfel antippen zum Festhalten oder direkt eine Wertung wählen.";
+
+  // Wertungsbogen: nur die eigene Spalte ist am eigenen Zug anklickbar
+  [0, 1].forEach(p => {
+    const sc = state.players[p].scores;
+    $("head-" + p).textContent = playerNames[p] + (p === mySeat ? " (du)" : "");
+    $("head-" + p).classList.toggle("turn", p === state.current);
+    $("up-" + p).textContent = totals[p].upper + " / " + BONUS_THRESHOLD;
+    $("bo-" + p).textContent = totals[p].bonus;
+    $("tot-" + p).textContent = totals[p].total;
+    CATEGORIES.forEach(cat => {
+      const el = $("c-" + p + "-" + cat.id);
+      const used = sc[cat.id] !== null;
+      const mine = p === mySeat && myTurn && hasRolled() && !state.busy;
+      const playable = mine && !used;
+      el.className = "cell" + (used ? " used" : "") + (playable ? " avail" : "");
+      el.disabled = !playable;
+      el.textContent = used ? sc[cat.id] : (mine ? calculateScore(cat.id, state.dice) : "");
+    });
+  });
+}
+
+/* ===== 7. Ereignisse ===== */
+$("createRoomBtn").addEventListener("click", createRoom);
+$("joinRoomBtn").addEventListener("click", joinRoom);
+$("roomCodeInput").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, ""); });
+$("copyRoomCodeBtn").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(roomId); $("copyRoomCodeBtn").textContent = "Code kopiert ✓"; }
+  catch (e) { $("lobbyMsg").textContent = "Raumcode: " + roomId + " (bitte manuell kopieren)"; }
+});
+$("leaveLobbyBtn").addEventListener("click", () => leaveRoom("Der Raum wurde geschlossen."));
+$("leaveGameBtn").addEventListener("click", () => {
+  if (confirm("Raum wirklich verlassen? Der Raum wird für beide Spieler geschlossen.")) leaveRoom("Du hast den Raum verlassen.");
+});
+$("restartBtn").addEventListener("click", async () => {
+  if (!confirm("Neue Runde für beide Spieler starten?")) return;
+  const { ok, data } = await api("/api/new", { roomId, seat: mySeat, token: seatToken });
+  if (!ok) showReaction(data.error || "Neustart nicht möglich.");
+  else lastVersion = -1;
+});
+$("rollBtn").addEventListener("click", rollDice);
+$("againBtn").addEventListener("click", async () => {
+  try {
+    const { ok } = await api("/api/new", { roomId, seat: mySeat, token: seatToken });
+    if (ok) { startNewLocalGameRecord(); lastVersion = -1; }
+  } catch (e) {}
+});
+$("menuBtn").addEventListener("click", () => leaveRoom("Der Raum wurde geschlossen."));
+
+if (mySeat !== null && roomId && seatToken) {
+  $("roomControls").hidden = true;
+  $("waitingLobby").hidden = false;
+  $("roomSlots").hidden = false;
+  $("roomCodeDisplay").textContent = roomId;
+  $("lobbyMsg").textContent = "Verbinde wieder mit deinem Raum …";
+} else {
+  mySeat = null;
+  try { ["kniffelSeat", "kniffelRoomId", "kniffelSeatToken"].forEach(key => sessionStorage.removeItem(key)); } catch (e) {}
+  setConnectionStatus(true, "Erstelle einen Raum oder tritt mit Code bei");
+}
+setInterval(poll, POLL_MS);
+/* ===== Ton-Einstellungen ===== */
+["pointerdown", "keydown"].forEach(ev => document.addEventListener(ev, () => Sound.init()));
+$("gearBtn").addEventListener("click", () => $("audioPanel").classList.toggle("open"));
+document.addEventListener("pointerdown", e => {
+  if (!$("audioPanel").contains(e.target) && !$("gearBtn").contains(e.target)) $("audioPanel").classList.remove("open");
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("audioPanel").classList.remove("open"); });
+$("musicOn").checked = Sound.settings.musicOn;
+$("musicVol").value = Math.round(Sound.settings.music * 100);
+$("sfxVol").value = Math.round(Sound.settings.sfx * 100);
+$("musicOn").addEventListener("change", e => Sound.setMusicOn(e.target.checked));
+$("trackSel").addEventListener("change", e => Sound.setTrack(Number(e.target.value)));
+$("musicVol").addEventListener("input", e => Sound.setMusicVol(e.target.value / 100));
+$("sfxVol").addEventListener("input", e => Sound.setSfxVol(e.target.value / 100));
+$("sfxVol").addEventListener("change", () => Sound.turn());   // Hörprobe nach dem Loslassen
+setTheme("halloween");
+
+/* ===== Easter Egg: 10x auf das K ===== */
+let kClicks = 0, kTimer = null;
+function hideScare() { $("scare").classList.remove("on"); }
+$("kEgg").addEventListener("click", () => {
+  kClicks++;
+  clearTimeout(kTimer);
+  kTimer = setTimeout(() => { kClicks = 0; }, 2500);
+  if (kClicks >= 10) {
+    kClicks = 0;
+    $("scare").classList.add("on");
+    Sound.scare();
+    setTimeout(hideScare, 1800);
+  }
+});
+$("scare").addEventListener("click", hideScare);
+</script>
+</body>
+</html>
