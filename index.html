@@ -9,8 +9,8 @@
     --bg:#120d17; --card:#1f1727; --card2:#2a2034; --line:#3b2d48;
     --text:#f3ece4; --muted:#9a8aa8; --orange:#ff7a1a; --purple:#9b5de5;
     --lava-a:rgba(155,93,229,.48); --lava-b:rgba(255,122,26,.38);
-    --die-light:#fff8e9; --die-face:#ded2b8; --die-edge:#9b8c70; --die-pip:#34251d;
-    --die-held-top:#ffe6c6; --die-held-bottom:#f3ae68; --die-held-edge:#bd650f; --dice-tray:#17121e;
+    --die-face:#ddd5c5; --die-edge:#aaa18f; --die-pip:#39352f;
+    --die-held-top:#e5d7c0; --die-held-edge:#a8895e; --dice-tray:#17121e;
     --radius:18px; --shadow:0 10px 30px rgba(0,0,0,.5);
   }
   * { box-sizing:border-box; }
@@ -48,6 +48,8 @@
     100% { transform:translate3d(-5vw,-46vh,0) scale(1.12); border-radius:39% 61% 60% 40% / 56% 44% 57% 43%; }
   }
   button { font:inherit; color:inherit; cursor:pointer; }
+  button:focus-visible, #gearBtn:focus-visible, .lobby-box input:focus-visible, .lobby-box select:focus-visible { outline:3px solid #f1c77f; outline-offset:3px; }
+  #audioPanel :focus-visible { outline:3px solid #f1c77f; outline-offset:3px; }
   .screen { display:none; min-height:100vh; padding:16px; }
   .screen.active { display:block; }
   #start.active, #end.active { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:18px; }
@@ -73,8 +75,6 @@
   .spooky span:nth-child(2) { animation-delay:-1s; } .spooky span:nth-child(3) { animation-delay:-2s; }
   @keyframes float { 0%,100%{transform:translateY(0) rotate(-5deg)} 50%{transform:translateY(-10px) rotate(5deg)} }
   .names { display:grid; gap:10px; width:min(320px,100%); }
-  .names input { padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--card); color:var(--text); font:inherit; text-align:center; }
-  .names input:focus { outline:2px solid var(--orange); }
   .winner { font-size:clamp(1.6rem,7vw,2.6rem); font-weight:900; color:var(--orange); }
   .summary { background:var(--card); border-radius:var(--radius); padding:16px 24px; box-shadow:var(--shadow); min-width:280px; border:1px solid var(--line); }
   .summary div { padding:6px 0; color:var(--muted); }
@@ -90,6 +90,7 @@
   .lobby-box { width:min(390px,100%); display:grid; gap:14px; padding:18px; background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
   .lobby-box h2 { margin:0; font-size:1.05rem; }
   .lobby-box input { width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card2); color:var(--text); color-scheme:dark; font:inherit; }
+  .lobby-box select { width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card2); color:var(--text); color-scheme:dark; font:inherit; }
   .lobby-box input:focus { outline:2px solid var(--orange); }
   .lobby-box input:-webkit-autofill,
   .lobby-box input:-webkit-autofill:hover,
@@ -104,8 +105,11 @@
   .connection-chip { border:1px solid var(--line); border-radius:10px; padding:6px 10px; color:var(--muted); font-size:.78rem; }
   .connection-chip.online { color:#9bd19f; border-color:#456949; }
   .connection-chip.offline { color:#f0a097; border-color:#77413e; }
+  .connection-chip.reconnecting { color:#f0c77c; border-color:#80663c; }
   .reaction-toast { min-height:1.5em; text-align:center; color:var(--orange); font-weight:800; opacity:0; transform:translateY(4px); transition:opacity .2s,transform .2s; }
   .reaction-toast.show { opacity:1; transform:translateY(0); }
+  .banner.turn-change { animation:turnArrival .42s ease-out; }
+  @keyframes turnArrival { 0% { transform:translateY(5px); opacity:.55; } 100% { transform:translateY(0); opacity:1; } }
   .die.landed { animation:dieLand .26s ease-out; }
   @keyframes dieLand { 0% { transform:translateY(-6px) scale(.97); } 72% { transform:translateY(1px) scale(1.015); } 100% { transform:translateY(0) scale(1); } }
   .recap-row { padding:8px 0; border-bottom:1px solid var(--line); }
@@ -126,6 +130,7 @@
   .layout { display:grid; grid-template-columns:1fr 1.1fr; gap:16px; align-items:start; }
   .card { background:var(--card); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow); border:1px solid var(--line); }
   .banner { text-align:center; font-weight:800; font-size:1.2rem; color:var(--orange); margin-bottom:14px; }
+  .banner.other-turn { color:var(--muted); }
 
   /* ---------- Würfel ---------- */
   .dice-area { min-height:130px; margin-bottom:8px; }
@@ -134,20 +139,19 @@
   .dice-row { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; padding:13px 10px 34px; border:1px solid rgba(255,255,255,.08); border-radius:18px;
     background:radial-gradient(ellipse at 50% 0%,rgba(255,255,255,.055),transparent 72%),var(--dice-tray);
     box-shadow:inset 0 3px 12px rgba(0,0,0,.32),0 8px 18px rgba(0,0,0,.14); perspective:900px; }
-  .die { aspect-ratio:1; width:100%; border:1px solid rgba(255,255,255,.72); border-radius:23%; padding:12%; position:relative; display:grid; grid-template:repeat(3,1fr)/repeat(3,1fr);
-    background:linear-gradient(145deg,rgba(255,255,255,.68),transparent 42%),linear-gradient(320deg,rgba(98,70,42,.12),transparent 52%),linear-gradient(145deg,var(--die-light),var(--die-face));
-    box-shadow:inset 0 1px 1px rgba(255,255,255,.95),inset 0 -3px 6px rgba(61,43,27,.18),0 5px 0 var(--die-edge),0 8px 13px rgba(0,0,0,.38);
-    transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; transform-style:preserve-3d; }
-  .die .pip { border-radius:50%; background:radial-gradient(circle at 32% 27%,rgba(255,255,255,.24),transparent 34%),var(--die-pip); margin:12%;
-    box-shadow:inset 0 1px 2px rgba(255,255,255,.16),inset 0 -2px 3px rgba(0,0,0,.48),0 1px 1px rgba(255,255,255,.3); }
-  button.die:hover:not(:disabled):not(.rolling) { transform:translateY(-3px) rotate(-1deg); box-shadow:inset 0 1px 1px rgba(255,255,255,.95),inset 0 -3px 6px rgba(61,43,27,.18),0 7px 0 var(--die-edge),0 12px 16px rgba(0,0,0,.38); }
+  .die { aspect-ratio:1; width:100%; border:1px solid #c9c1b2; border-radius:21%; padding:12%; position:relative; display:grid; grid-template:repeat(3,1fr)/repeat(3,1fr);
+    background:var(--die-face);
+    box-shadow:0 4px 0 var(--die-edge),0 6px 10px rgba(0,0,0,.28),inset 0 0 0 1px rgba(255,255,255,.2);
+    transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease; }
+  .die .pip { border-radius:50%; background:var(--die-pip); margin:12%; }
+  button.die:hover:not(:disabled):not(.rolling) { transform:translateY(-2px); box-shadow:0 6px 0 var(--die-edge),0 9px 13px rgba(0,0,0,.32); }
   button.die:focus-visible { outline:3px solid var(--orange); outline-offset:4px; }
   button.die:disabled { cursor:default; }
-  .die.held { border-color:rgba(255,255,255,.92); background:linear-gradient(145deg,rgba(255,255,255,.5),transparent 48%),linear-gradient(145deg,var(--die-held-top),var(--die-held-bottom));
-    box-shadow:0 5px 0 var(--die-held-edge),0 0 0 2px var(--orange),0 0 18px rgba(255,122,26,.32),inset 0 1px 1px rgba(255,255,255,.88),inset 0 -3px 6px rgba(72,35,14,.16); transform:translateY(3px) scale(.985); }
-  .die.held::after { content:"FEST"; position:absolute; left:0; right:0; bottom:-26px; text-align:center; font-size:.58rem; font-weight:850; letter-spacing:.12em; color:var(--orange); text-shadow:0 1px 6px rgba(0,0,0,.35); }
-  .die.rolling { animation:tumble .76s cubic-bezier(.2,.75,.25,1); transform-origin:center; }
-  @keyframes tumble { 0%{transform:perspective(500px) translateY(0) rotateX(0) rotateY(0) rotateZ(0) scale(1)} 28%{transform:perspective(500px) translateY(-9px) rotateX(14deg) rotateY(-18deg) rotateZ(58deg) scale(.96)} 68%{transform:perspective(500px) translateY(-3px) rotateX(-10deg) rotateY(12deg) rotateZ(245deg) scale(1.02)} 100%{transform:perspective(500px) translateY(0) rotateX(0) rotateY(0) rotateZ(360deg) scale(1)} }
+  .die.held { border-color:var(--die-held-edge); background:var(--die-held-top);
+    box-shadow:0 3px 0 var(--die-held-edge),0 0 0 2px rgba(255,183,91,.45); transform:translateY(2px) scale(.985); }
+  .die.held::after { content:"✓"; position:absolute; top:-7px; right:-7px; display:grid; place-items:center; width:20px; height:20px; border-radius:50%; color:#21180e; background:#e7bd7b; border:1px solid #f2d9ae; font-size:.78rem; font-weight:900; box-shadow:0 2px 5px rgba(0,0,0,.3); }
+  .die.rolling { animation:dieRoll .76s cubic-bezier(.2,.75,.25,1) both; animation-delay:var(--roll-delay, 0ms); transform-origin:center; }
+  @keyframes dieRoll { 0%{transform:translateY(0) rotate(0) scale(1)} 22%{transform:translateY(-15px) rotate(70deg) scale(.96)} 52%{transform:translateY(-5px) rotate(205deg) scale(1.04)} 78%{transform:translateY(-9px) rotate(300deg) scale(.99)} 100%{transform:translateY(0) rotate(360deg) scale(1)} }
   .roll-info { display:flex; justify-content:space-between; align-items:center; margin:12px 0; color:var(--muted); }
   .roll-dots { display:flex; gap:8px; }
   .roll-dots i { width:14px; height:14px; border-radius:50%; background:var(--orange); box-shadow:0 0 10px var(--orange); }
@@ -156,22 +160,30 @@
   .hint { min-height:2.6em; margin:12px 0 0; color:var(--muted); font-size:.9rem; text-align:center; }
 
   /* ---------- Wertungsbogen ---------- */
-  .srow { display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:6px; margin-bottom:5px; align-items:center; }
-  .lbl { font-size:.9rem; }
+  .srow { display:grid; grid-template-columns:minmax(0,1.4fr) repeat(var(--player-count,2),minmax(0,1fr)); gap:6px; margin-bottom:5px; align-items:center; }
+  .lbl { min-width:0; font-size:.9rem; overflow-wrap:anywhere; }
   .shead .cell { background:transparent; border:0; color:var(--muted); font-size:.8rem; padding:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .shead .cell.turn { color:var(--orange); }
   .cell { background:var(--card2); border:1px solid transparent; border-radius:8px; padding:8px 4px; text-align:center; font-weight:800; min-height:36px; font-variant-numeric:tabular-nums; }
   .cell:disabled { cursor:default; }
-  .cell.avail { border:1px dashed var(--orange); color:var(--orange); }
-  .cell.avail:hover { border-style:solid; background:#3a2a1c; transform:scale(1.04); }
+  .cell.avail { color:var(--orange); }
+  .cell.avail:hover { background:#3a2a1c; transform:scale(1.04); }
   .cell.used { background:transparent; border-color:var(--line); }
   .srow.info { color:var(--muted); font-size:.85rem; }
   .srow.info .cell { background:transparent; border:0; font-weight:600; }
   .srow.total .cell { color:var(--orange); font-size:1.15rem; }
   .sep { height:1px; background:var(--line); margin:8px 0; }
+  .cell.avail:focus-visible { outline:2px solid #f1c77f; outline-offset:2px; }
+  .reconnect-note { color:#f0c77c; font-size:.84rem; text-align:center; }
+  .reconnect-note[hidden] { display:none; }
+  .player-connection-notice { margin:8px 0; padding:10px 12px; border:1px solid #80663c; border-radius:10px; color:#f0c77c; background:rgba(80,58,25,.26); text-align:center; font-size:.88rem; }
+  .player-connection-notice[hidden] { display:none; }
 
   @media (max-width:760px) { .layout { grid-template-columns:1fr; } .card { padding:14px; } }
-  @media (prefers-reduced-motion:reduce) { * { animation:none !important; transition:none !important; } }
+  @media (prefers-reduced-motion:reduce) {
+    * { animation:none !important; transition:none !important; }
+    .die.rolling { animation:dieRoll .76s ease-out both !important; animation-delay:var(--roll-delay, 0ms) !important; }
+  }
   @media (max-width:760px) {
     body::before, body::after { width:85vw; filter:blur(34px); opacity:.48; }
   }
@@ -186,11 +198,8 @@
 #audioPanel select { background:var(--card2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px; font:inherit; }
 #kEgg { user-select:none; }
 #scare { position:fixed; inset:0; z-index:9999; background:#000; display:none; align-items:center; justify-content:center; cursor:pointer; }
-#scare.on { display:flex; animation:scareFlash .5s steps(2) 4; }
-#scare .face { font-size:55vmin; animation:scarePop .3s ease-out, scareShake .08s linear .3s infinite; }
-@keyframes scarePop { from { transform:scale(.1); } to { transform:scale(1); } }
-@keyframes scareShake { 0% { transform:translate(-8px,4px) scale(1.05); } 50% { transform:translate(8px,-4px) scale(1.1); } 100% { transform:translate(-4px,-6px) scale(1.05); } }
-@keyframes scareFlash { 0% { background:#b00; } 50% { background:#000; } }
+#scare.on { display:flex; }
+#scareVideo { display:block; width:100%; height:100%; object-fit:contain; background:#000; }
 
 </style>
 </head>
@@ -202,19 +211,25 @@
   <h1 class="title"><span id="kEgg">K</span>niffel</h1>
   <section class="lobby-box" id="roomControls">
     <h2>Neuen Raum erstellen</h2>
-    <input id="name0" maxlength="14" placeholder="Dein Name" autocomplete="nickname">
+    <input id="name0" maxlength="14" placeholder="Dein Name" aria-label="Dein Name" autocomplete="nickname">
+    <label class="hint" for="playerCount">Spielerzahl (du kannst 2 bis 4 wählen)</label>
+    <select id="playerCount" aria-label="Spielerzahl">
+      <option value="2">2 Spieler</option><option value="3">3 Spieler</option><option value="4">4 Spieler</option>
+    </select>
     <div class="lobby-actions"><button class="btn" id="createRoomBtn">Raum erstellen</button></div>
     <div class="lobby-separator">oder beitreten</div>
-    <input id="roomCodeInput" maxlength="6" placeholder="6-stelliger Raumcode" autocomplete="off" style="text-transform:uppercase;letter-spacing:.12em;text-align:center">
+    <input id="roomCodeInput" maxlength="6" placeholder="6-stelliger Raumcode" aria-label="6-stelliger Raumcode" autocomplete="off" style="text-transform:uppercase;letter-spacing:.12em;text-align:center">
     <div class="lobby-actions"><button class="btn ghost" id="joinRoomBtn">Raum beitreten</button></div>
   </section>
   <p class="hint" id="lobbyMsg"></p>
-  <div class="lobby-status"><span class="status-dot" id="connectionDot"></span><span id="connectionText">Prüfe Verbindung …</span></div>
-  <div class="lobby-slots" id="roomSlots" hidden><span id="lobbySlot0">Spieler 1 · Platz frei</span><span id="lobbySlot1">Spieler 2 · Platz frei</span></div>
+  <p class="player-connection-notice" id="lobbyPlayerNotice" role="status" aria-live="polite" hidden></p>
+  <div class="lobby-status" role="status" aria-live="polite"><span class="status-dot" id="connectionDot"></span><span id="connectionText">Prüfe Verbindung …</span></div>
+  <div class="lobby-slots" id="roomSlots" aria-live="polite" hidden><span id="lobbySlot0"></span><span id="lobbySlot1"></span><span id="lobbySlot2"></span><span id="lobbySlot3"></span></div>
   <section class="lobby-box" id="waitingLobby" hidden>
     <h2>Dein Raumcode</h2><div class="room-code" id="roomCodeDisplay"></div>
     <button class="btn ghost" id="copyRoomCodeBtn">Code kopieren</button>
-    <p class="hint">Teile den Code mit deinem Mitspieler. Zum Beitreten wird kein Passwort benötigt.</p>
+    <button class="btn ghost" id="copyInviteLinkBtn">Einladungslink kopieren</button>
+    <p class="hint">Teile den Code mit den anderen Spielern. Das Spiel startet, sobald alle ausgewählten Plätze belegt sind.</p>
     <button class="btn ghost" id="leaveLobbyBtn">Raum verlassen</button>
   </section>
 </section>
@@ -224,18 +239,20 @@
   <div class="game-wrap">
     <div class="topbar">
       <div class="stat"><small>Runde</small><span id="roundLabel">1 / 13</span></div>
-      <div class="chips"><div class="chip" id="chip0"></div><div class="chip" id="chip1"></div></div>
-      <span class="connection-chip" id="gameConnection">Verbinde …</span>
+      <div class="chips"><div class="chip" id="chip0"></div><div class="chip" id="chip1"></div><div class="chip" id="chip2"></div><div class="chip" id="chip3"></div></div>
+      <span class="connection-chip" id="gameConnection" role="status" aria-live="polite">Verbinde …</span>
       <button class="btn ghost" id="restartBtn">Neustart</button>
       <button class="btn ghost" id="leaveGameBtn">Raum verlassen</button>
     </div>
     <div class="layout">
       <div class="card">
-        <div class="banner" id="turnBanner"></div>
+        <div class="banner" id="turnBanner" role="status" aria-live="polite"></div>
+        <p class="player-connection-notice" id="gamePlayerNotice" role="status" aria-live="polite" hidden></p>
         <div class="dice-area" id="diceArea"></div>
         <div class="roll-info"><span id="rollsText"></span><span class="roll-dots" id="rollDots"></span></div>
         <button class="btn" id="rollBtn">Würfeln</button>
         <p class="hint" id="hint"></p>
+        <p class="reconnect-note" id="reconnectNote" hidden>Verbindung unterbrochen – dein Spielstand bleibt erhalten. Neuer Versuch läuft …</p>
         <div class="reaction-toast" id="reactionToast" aria-live="polite"></div>
       </div>
       <div class="card" id="sheet"></div>
@@ -254,16 +271,19 @@
     <button class="btn ghost" id="menuBtn">Hauptmenü</button>
   </div>
 </section>
-<button id="gearBtn" title="Einstellungen" aria-label="Einstellungen">⚙️</button>
-<div id="audioPanel" aria-label="Einstellungen">
-  <label><span>Hintergrundmusik</span><input type="checkbox" id="musicOn"></label>
-  <label><span>Titel</span><select id="trackSel"></select></label>
-  <label><span>Musik-Lautstärke</span></label>
+<button id="gearBtn" title="Einstellungen" aria-label="Einstellungen" aria-controls="audioPanel" aria-expanded="false">⚙️</button>
+<div id="audioPanel" role="region" aria-label="Einstellungen">
+  <label for="reactionsOn"><span>Kleine Spielreaktionen</span><input type="checkbox" id="reactionsOn"></label>
+  <label for="musicOn"><span>Hintergrundmusik</span><input type="checkbox" id="musicOn"></label>
+  <label for="trackSel"><span>Titel</span><select id="trackSel"></select></label>
+  <label for="musicVol">Musik-Lautstärke</label>
   <input type="range" id="musicVol" min="0" max="100">
-  <label><span>Effekt-Lautstärke</span></label>
+  <label for="sfxVol">Effekt-Lautstärke</label>
   <input type="range" id="sfxVol" min="0" max="100">
 </div>
-<div id="scare"><div class="face">💀</div></div>
+<div id="scare" aria-label="Jumpscare"><video id="scareVideo" playsinline preload="auto">
+  <source src="vlipsy-creepy-face-jump-scare-3hEsFXt9.mp4" type="video/mp4">
+</video></div>
 
 <script>
 "use strict";
@@ -273,7 +293,7 @@ const Sound = (() => {
   const KEY = "kniffelAudio";
   let stored = {};
   try { stored = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
-  const s = Object.assign({ musicOn: true, music: 0.25, sfx: 0.6, track: 0 }, stored);
+  const s = Object.assign({ musicOn: true, music: 0.25, sfx: 0.6, track: 0, reactionsOn: true }, stored);
   let ctx = null, musicGain, sfxGain, noiseBuf, timer = null, step = 0, next = 0;
 
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} };
@@ -349,6 +369,7 @@ const Sound = (() => {
   const ready = () => ctx && s.sfx > 0;
   return {
     settings: s, trackNames: TRACKS.map(t => t.name), init,
+    setReactionsOn(b) { s.reactionsOn = b; save(); },
     setMusicOn(b) { s.musicOn = b; save(); if (ctx) b ? startMusic() : stopMusic(); },
     setMusicVol(v) { s.music = v; save(); if (ctx && s.musicOn) fade(musicGain, v * 0.35); },
     setSfxVol(v) { s.sfx = v; save(); if (ctx) fade(sfxGain, v); },
@@ -393,17 +414,6 @@ const Sound = (() => {
       const t = ctx.currentTime;
       [57, 60, 64, 69].forEach((m, i) => tone("triangle", hz(m), t + i * 0.15, 0.7, 0.25, sfxGain));
     },
-    scare() {
-      if (!ready()) return;
-      const t = ctx.currentTime;
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = "sawtooth";
-      o.frequency.setValueAtTime(300, t); o.frequency.exponentialRampToValueAtTime(1800, t + 0.35);
-      g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
-      o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + 1);
-      noise(t, 0.7, 2500, 0.8, sfxGain);
-      tone("sine", 60, t, 0.8, 0.9, sfxGain);
-    }
   };
 })();
 
@@ -423,7 +433,7 @@ const CATEGORIES = [
   { id:"yahtzee", label:"Kniffel", block:"lower" },
   { id:"chance",  label:"Chance", block:"lower" }
 ];
-const TOTAL_ROUNDS = 13, MAX_ROLLS = 3, BONUS_THRESHOLD = 63, BONUS_POINTS = 35, ROLL_MS = 760, POLL_MS = 300;
+const TOTAL_ROUNDS = 13, MAX_ROLLS = 3, BONUS_THRESHOLD = 63, BONUS_POINTS = 35, ROLL_MS = 900, POLL_MS = 600;
 const PIP_LAYOUT = { 1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8] };
 
 /* ===== 2. Wertungslogik (reine Funktionen) ===== */
@@ -459,16 +469,19 @@ function calculateTotals(scores) {
 
 /* ===== 3. Zustand ===== */
 let playerNames = ["Spieler 1", "Spieler 2"];
+let opponentConnectionState = null;
+let focusDieAfterRoll = false;
 let state = null;        // aktueller Spielstand (kommt vom Server)
 let mySeat = null;       // 0 = Spieler 1, 1 = Spieler 2
 let roomId = null;
 let seatToken = null;
 let lastVersion = -1;    // zuletzt übernommene Server-Version
-let sheetBuilt = false;
-let polling = false;
-let pushQueue = Promise.resolve();
+let sheetPlayerCount = 0;
+let polling = false, pollTimer = null, networkFailures = 0;
+let pendingMove = null, sendingMove = false;
 let seenRollId = 0;      // zuletzt gesehener Wurf des Gegners
 let wasMyTurn = false;
+let renderedTurn = null;
 let reactionTimer = null, finishedGameId = null;
 let diceFaceInterval = null, diceMotionTimeout = null;
 const PLAYER_STATS_KEY = "kniffelPlayerStatsV1", RECORDED_GAMES_KEY = "kniffelRecordedGamesV1", GAME_ID_KEY = "kniffelGameId";
@@ -481,20 +494,60 @@ try {
 function startNewLocalGameRecord() {
   currentGameId = createGameId();
   finishedGameId = null;
+  renderedTurn = null;
+  seenRollId = 0;
+  wasMyTurn = false;
   try { sessionStorage.setItem(GAME_ID_KEY, currentGameId); } catch (e) {}
+  try {
+    if (roomId && mySeat !== null) localStorage.setItem("kniffelGameId:" + roomId + ":" + mySeat, currentGameId);
+  } catch (e) {}
 }
 
+function syncGameRecordId(gameId) {
+  if (typeof gameId !== "string" || !gameId || gameId === currentGameId) return;
+  currentGameId = gameId;
+  finishedGameId = null;
+  try { sessionStorage.setItem(GAME_ID_KEY, currentGameId); } catch (e) {}
+  try {
+    if (roomId && mySeat !== null) localStorage.setItem("kniffelGameId:" + roomId + ":" + mySeat, currentGameId);
+  } catch (e) {}
+}
+
+const inviteRoom = new URLSearchParams(location.search).get("room");
 try {
-  const s = sessionStorage.getItem("kniffelSeat"); if (s !== null) mySeat = Number(s);
-  roomId = sessionStorage.getItem("kniffelRoomId");
-  seatToken = sessionStorage.getItem("kniffelSeatToken");
+  const savedRoom = JSON.parse(localStorage.getItem("kniffelRoomSession") || "null");
+  if (savedRoom && (!inviteRoom || savedRoom.roomId === inviteRoom.toUpperCase()) &&
+      Number.isInteger(savedRoom.seat) && savedRoom.seat >= 0 && savedRoom.seat <= 1 &&
+      typeof savedRoom.roomId === "string" && /^[A-HJ-NP-Z2-9]{6}$/i.test(savedRoom.roomId) &&
+      typeof savedRoom.token === "string" && savedRoom.token.length > 0) {
+    mySeat = savedRoom.seat;
+    roomId = savedRoom.roomId;
+    seatToken = savedRoom.token;
+  } else if (!inviteRoom) {
+    const s = sessionStorage.getItem("kniffelSeat"); if (s !== null) mySeat = Number(s);
+    roomId = sessionStorage.getItem("kniffelRoomId");
+    seatToken = sessionStorage.getItem("kniffelSeatToken");
+  }
+} catch (e) {}
+if (mySeat !== null && (!Number.isInteger(mySeat) || mySeat < 0 || mySeat > 1 ||
+    typeof roomId !== "string" || !/^[A-HJ-NP-Z2-9]{6}$/i.test(roomId) ||
+    typeof seatToken !== "string" || !seatToken)) {
+  mySeat = null; roomId = null; seatToken = null;
+}
+try {
+  if (roomId && mySeat !== null) {
+    currentGameId = localStorage.getItem("kniffelGameId:" + roomId + ":" + mySeat) || currentGameId;
+    pendingMove = JSON.parse(localStorage.getItem("kniffelPendingMove:" + roomId + ":" + mySeat) || "null");
+    if (pendingMove) delete pendingMove.history;
+  }
 } catch (e) {}
 
 const hasRolled = () => state.rollsLeft < MAX_ROLLS;
 const isMyTurn = () => state !== null && !state.over && state.current === mySeat;
 const randomDie = () => Math.floor(Math.random() * 6) + 1;
 
-function showReaction(message) {
+function showReaction(message, { force = false } = {}) {
+  if (!force && !Sound.settings.reactionsOn) return;
   const toast = $("reactionToast");
   if (!toast) return;
   clearTimeout(reactionTimer);
@@ -524,6 +577,26 @@ function stopDiceMotionTimers() {
   diceMotionTimeout = null;
 }
 
+function randomFaceExcept(finalValue) {
+  const value = Math.floor(Math.random() * 5) + 1;
+  return value >= finalValue ? value + 1 : value;
+}
+
+function setRollingFaces(indices) {
+  indices.forEach(index => { state.shown[index] = randomFaceExcept(state.dice[index]); });
+}
+
+function updateRollingDieFaces(indices) {
+  const dice = $("diceArea").querySelectorAll(".die");
+  indices.forEach(index => {
+    const die = dice[index];
+    if (!die) return;
+    const pips = PIP_LAYOUT[state.shown[index]] || [];
+    Array.from(die.children).forEach((pip, position) => pip.classList.toggle("pip", pips.includes(position)));
+    die.setAttribute("aria-label", "Würfel " + (index + 1) + ": " + state.shown[index]);
+  });
+}
+
 function startDiceMotion(indices, rollId) {
   stopDiceMotionTimers();
   if (!indices.length) {
@@ -532,12 +605,11 @@ function startDiceMotion(indices, rollId) {
     render();
     return;
   }
-  const rolling = new Set(indices);
   diceFaceInterval = setInterval(() => {
     if (!state || state.rollId !== rollId) { stopDiceMotionTimers(); return; }
-    state.shown = state.dice.map((value, i) => rolling.has(i) ? randomDie() : value);
-    updateRollingDieFaces();
-  }, 85);
+    setRollingFaces(indices);
+    updateRollingDieFaces(indices);
+  }, 90);
   diceMotionTimeout = setTimeout(() => {
     if (!state || state.rollId !== rollId) { stopDiceMotionTimers(); return; }
     stopDiceMotionTimers();
@@ -552,6 +624,7 @@ function startDiceMotion(indices, rollId) {
 function applyGame(g) {
   state = { players: g.players, current: g.current, round: g.round, dice: g.dice, held: g.held,
             rollsLeft: g.rollsLeft, over: g.over, rolling: g.rolling || [], rollId: g.rollId || 0,
+            gameId: g.gameId || currentGameId,
             busy: false, rollingIdx: new Set(), landedIdx: new Set(), shown: [...g.dice] };
 }
 function resetTurn() {
@@ -564,23 +637,33 @@ async function api(path, body) {
   const options = body === undefined ? {} :
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
   const res = await fetch(path, options);
-  return { ok: res.ok, data: await res.json() };
+  return { ok: res.ok, status: res.status, data: await res.json() };
 }
 
-function setConnectionStatus(online, text) {
+function setConnectionStatus(online, text, reconnecting = false) {
   const dot = $("connectionDot"), copy = $("connectionText"), game = $("gameConnection");
-  if (dot) dot.className = "status-dot " + (online ? "online" : "offline");
+  if (dot) dot.className = "status-dot " + (online ? "online" : reconnecting ? "reconnecting" : "offline");
   if (copy) copy.textContent = text;
-  if (game) { game.textContent = online ? "Verbunden" : "Verbindung wird gesucht …"; game.className = "connection-chip " + (online ? "online" : "offline"); }
+  if (game) { game.textContent = online ? "Verbunden" : reconnecting ? "Verbindung wird wiederhergestellt …" : "Nicht verbunden"; game.className = "connection-chip " + (online ? "online" : reconnecting ? "reconnecting" : "offline"); }
+  const note = $("reconnectNote");
+  if (note) note.hidden = online || !reconnecting;
+}
+
+function schedulePoll(delay = POLL_MS) {
+  clearTimeout(pollTimer);
+  if (mySeat !== null) pollTimer = setTimeout(poll, delay);
 }
 function updateLobbySlots(names = []) {
-  [0, 1].forEach(i => {
+  [0, 1, 2, 3].forEach(i => {
     const name = names[i];
-    $("lobbySlot" + i).textContent = "Spieler " + (i + 1) + " · " + (name || "Warte auf Mitspieler");
+    const slot = $("lobbySlot" + i);
+    slot.hidden = i >= names.length;
+    slot.textContent = "Spieler " + (i + 1) + " · " + (name || "Platz frei");
   });
 }
 
 function saveRoomSession() {
+  try { localStorage.setItem("kniffelRoomSession", JSON.stringify({ seat: mySeat, roomId, token: seatToken })); } catch (e) {}
   try {
     sessionStorage.setItem("kniffelSeat", mySeat);
     sessionStorage.setItem("kniffelRoomId", roomId);
@@ -588,38 +671,101 @@ function saveRoomSession() {
   } catch (e) {}
 }
 
-// Eigenen Zug an den Server melden
-async function push() {
-  const game = JSON.parse(JSON.stringify({
+function clearRoomSession() {
+  try { localStorage.removeItem("kniffelRoomSession"); } catch (e) {}
+  try {
+    ["kniffelSeat", "kniffelRoomId", "kniffelSeatToken"].forEach(key => sessionStorage.removeItem(key));
+  } catch (e) {}
+}
+
+function savePendingMove() {
+  try {
+    if (roomId && mySeat !== null) localStorage.setItem("kniffelPendingMove:" + roomId + ":" + mySeat, JSON.stringify(pendingMove));
+  } catch (e) {}
+}
+
+function discardPendingMove() {
+  pendingMove = null;
+  try {
+    if (roomId && mySeat !== null) localStorage.removeItem("kniffelPendingMove:" + roomId + ":" + mySeat);
+  } catch (e) {}
+}
+
+async function flushPendingMove() {
+  if (!pendingMove || sendingMove || mySeat === null) return;
+  sendingMove = true;
+  try {
+    while (pendingMove && mySeat !== null) {
+      const game = pendingMove;
+      let response;
+      try {
+        response = await api("/api/move", { roomId, seat: mySeat, token: seatToken, version: lastVersion, game });
+      } catch (e) {
+        setConnectionStatus(false, "Zug wird gespeichert, sobald die Verbindung zurück ist …", true);
+        schedulePoll(1000);
+        return;
+      }
+      if (response.ok) {
+        lastVersion = response.data.version;
+        if (pendingMove === game) discardPendingMove();
+        continue;
+      }
+      if (response.status === 409) {
+        discardPendingMove();
+        lastVersion = -1;
+        schedulePoll(0);
+        return;
+      }
+      if ([403, 404, 410].includes(response.status)) {
+        discardPendingMove();
+        leaveToStart(response.data.error || "Der Raum wurde geschlossen.");
+        return;
+      }
+      if (response.status < 500 && response.status !== 429) {
+        discardPendingMove();
+        lastVersion = -1;
+        showReaction(response.data.error || "Der Zug konnte nicht gespeichert werden.", { force: true });
+        schedulePoll(0);
+        return;
+      }
+      setConnectionStatus(false, "Zug wird gespeichert, sobald der Server erreichbar ist …", true);
+      schedulePoll(1500);
+      return;
+    }
+  } finally {
+    sendingMove = false;
+  }
+}
+
+function push() {
+  pendingMove = JSON.parse(JSON.stringify({
     players: state.players, current: state.current, round: state.round, dice: state.dice,
     held: state.held, rollsLeft: state.rollsLeft, over: state.over,
-    rolling: state.rolling, rollId: state.rollId
+    rolling: state.rolling, rollId: state.rollId, gameId: state.gameId || currentGameId
   }));
-  const send = async () => {
-    try {
-      const { ok, data } = await api("/api/move", { roomId, seat: mySeat, token: seatToken, version: lastVersion, game });
-      lastVersion = ok ? data.version : -1;
-    } catch (e) { lastVersion = -1; }
-  };
-  pushQueue = pushQueue.then(send, send);
-  return pushQueue;
+  savePendingMove();
+  flushPendingMove();
 }
 
 function enterRoom(data) {
   mySeat = data.seat; roomId = data.roomId; seatToken = data.token; lastVersion = -1;
+  opponentConnectionState = null;
   saveRoomSession();
   startNewLocalGameRecord();
   $("roomControls").hidden = true;
   $("waitingLobby").hidden = false;
   $("roomSlots").hidden = false;
   $("roomCodeDisplay").textContent = roomId;
-  $("lobbyMsg").textContent = "Warte auf deinen Mitspieler …";
+  $("lobbyMsg").textContent = "Warte auf Mitspieler …";
   setConnectionStatus(true, "Du bist Spieler " + (mySeat + 1) + " · warte auf Mitspieler");
+  schedulePoll(0);
 }
 
 async function createRoom() {
   try {
-    const { ok, data } = await api("/api/create", { name: $("name0").value.trim() });
+    const { ok, data } = await api("/api/create", {
+      name: $("name0").value.trim(), playerCount: Number($("playerCount").value)
+    });
     if (!ok) { $("lobbyMsg").textContent = data.error || "Raum konnte nicht erstellt werden."; return; }
     enterRoom(data);
   } catch (e) { $("lobbyMsg").textContent = "Server nicht erreichbar. Bitte später erneut versuchen."; setConnectionStatus(false, "Server nicht erreichbar"); }
@@ -637,12 +783,18 @@ async function joinRoom() {
 }
 
 function leaveToStart(message = "") {
+  discardPendingMove();
   mySeat = null; state = null; roomId = null; seatToken = null; lastVersion = -1;
-  try { ["kniffelSeat", "kniffelRoomId", "kniffelSeatToken"].forEach(key => sessionStorage.removeItem(key)); } catch (e) {}
+  clearTimeout(pollTimer);
+  pollTimer = null;
+  clearRoomSession();
+  opponentConnectionState = null;
+  ["lobbyPlayerNotice", "gamePlayerNotice"].forEach(id => { $(id).hidden = true; $(id).textContent = ""; });
+  $("reconnectNote").hidden = true;
   $("roomControls").hidden = false;
   $("waitingLobby").hidden = true;
   $("roomSlots").hidden = true;
-  updateLobbySlots([null, null]);
+  updateLobbySlots([]);
   $("lobbyMsg").textContent = message;
   setConnectionStatus(true, "Erstelle einen Raum oder tritt mit Code bei");
   showScreen("start");
@@ -658,26 +810,59 @@ async function leaveRoom(message = "") {
 async function poll() {
   if (polling || mySeat === null) return;
   polling = true;
+  let nextDelay = POLL_MS;
   try {
-    const { ok, data } = await api("/api/state", { roomId, seat: mySeat, token: seatToken });
-    if (!ok) { leaveToStart(data.error || "Der Raum wurde geschlossen."); polling = false; return; }
+    const { ok, status, data } = await api("/api/state", { roomId, seat: mySeat, token: seatToken });
+    if (!ok) {
+      if ([403, 404, 410].includes(status)) {
+        leaveToStart(data.error || "Der Raum wurde geschlossen.");
+        return;
+      }
+      throw new Error(data.error || "Spielserver vorübergehend nicht erreichbar.");
+    }
+    networkFailures = 0;
     setConnectionStatus(true, "Spielserver erreichbar");
     document.title = "Kniffel – Halloween";
     handleServerState(data);
-  } catch (e) { document.title = "⚠ Verbindung weg – Kniffel"; setConnectionStatus(false, "Verbindung unterbrochen · erneuter Versuch läuft"); }
-  polling = false;
+  } catch (e) {
+    networkFailures++;
+    nextDelay = Math.min(10000, 1000 * (2 ** Math.min(networkFailures - 1, 4)));
+    document.title = "⚠ Verbindung weg – Kniffel";
+    setConnectionStatus(false, "Verbindung unterbrochen · erneuter Versuch in " + Math.ceil(nextDelay / 1000) + " s", true);
+  } finally {
+    polling = false;
+    if (mySeat !== null) schedulePoll(nextDelay);
+  }
 }
 
 function handleServerState(d) {
   if (d.names[mySeat] === null) { leaveToStart("Der Raum wurde geschlossen."); return; }
   playerNames = d.names.map((n, i) => n || "Spieler " + (i + 1));
   updateLobbySlots(d.names);
-  if (!d.game) { $("lobbyMsg").textContent = "Warte auf Mitspieler …"; return; }
+  updateOpponentConnection(d);
+  if (!d.game) {
+    const joined = d.names.filter(Boolean).length;
+    $("lobbyMsg").textContent = "Warte auf Spieler " + (joined + 1) + " von " + d.names.length + " …";
+    return;
+  }
+  if (pendingMove) {
+    if (JSON.stringify(d.game) === JSON.stringify(pendingMove)) discardPendingMove();
+    else {
+      lastVersion = d.version;
+      setConnectionStatus(false, "Spielstand wird synchronisiert …", true);
+      flushPendingMove();
+      return;
+    }
+  }
   if (d.version <= lastVersion || (state && state.busy)) return;  // nichts Neues
   const firstSync = lastVersion === -1;
   lastVersion = d.version;
   applyGame(d.game);
-  if (!sheetBuilt) { buildSheet(); sheetBuilt = true; }
+  syncGameRecordId(state.gameId);
+  if (sheetPlayerCount !== state.players.length) {
+    buildSheet();
+    sheetPlayerCount = state.players.length;
+  }
   if (state.over) {
     finishGame();
   } else {
@@ -693,9 +878,30 @@ function handleServerState(d) {
   wasMyTurn = nowMyTurn;             
 }
 
+function updateOpponentConnection(data) {
+  const names = Array.isArray(data.names) ? data.names : [];
+  const offline = names.flatMap((name, seat) => name && seat !== mySeat && Array.isArray(data.online) && data.online[seat] === false
+    ? [playerNames[seat]] : []);
+  const connectionState = offline.join("|");
+  const message = offline.length
+    ? (offline.length === 1 ? offline[0] + " hat" : offline.join(", ") + " haben") + " die Verbindung verloren. Die Partie wartet auf die Rückkehr."
+    : "";
+  ["lobbyPlayerNotice", "gamePlayerNotice"].forEach(id => {
+    const notice = $(id);
+    notice.textContent = message;
+    notice.hidden = !message;
+  });
+  if (opponentConnectionState !== null && connectionState !== opponentConnectionState) {
+    if (offline.length) showReaction(message, { force: true });
+    else showReaction("Alle Mitspieler sind wieder verbunden.", { force: true });
+  }
+  opponentConnectionState = connectionState;
+}
+
 /* ===== 5. Aktionen (nur für den Spieler am Zug) ===== */
 function rollDice() {
   if (!isMyTurn() || state.busy || state.rollsLeft <= 0) return;
+  focusDieAfterRoll = document.activeElement === $("rollBtn");
   state.busy = true;
   if (state.rollsLeft === MAX_ROLLS) state.held.fill(false);
   const finalDice = state.dice.map((v, i) => (state.held[i] && v > 0) ? v : randomDie());
@@ -708,7 +914,8 @@ function rollDice() {
   state.rollId++;
   const rollId = state.rollId;
   state.rollsLeft--;
-  state.shown = state.dice.map((value, i) => state.rollingIdx.has(i) ? randomDie() : value);
+  state.shown = [...finalDice];
+  setRollingFaces(rolling);
   push();                                  // Gegner sieht den Wurf sofort
   render();
   startDiceMotion(rolling, rollId);
@@ -719,7 +926,8 @@ function playRemoteRoll(indices) {
   state.busy = true;
   state.rollingIdx = new Set(indices);
   state.landedIdx.clear();
-  state.shown = state.dice.map((value, i) => state.rollingIdx.has(i) ? randomDie() : value);
+  state.shown = [...state.dice];
+  setRollingFaces(indices);
   const rollId = state.rollId;
   render();
   startDiceMotion(indices, rollId);
@@ -737,10 +945,16 @@ function scoreCategory(playerIndex, categoryId) {
   const scores = state.players[playerIndex].scores;
   if (scores[categoryId] !== null) return;
   Sound.score();
-  scores[categoryId] = calculateScore(categoryId, state.dice);
-  if (state.current === 1) state.round++;
+  const points = calculateScore(categoryId, state.dice);
+  scores[categoryId] = points;
+  const maxKind = Math.max(...state.dice.map(value => state.dice.filter(die => die === value).length));
+  if (categoryId === "yahtzee" && points === 50) showReaction("✨ Kniffel!");
+  else if (categoryId === "largeStraight" && points === 40) showReaction("🌟 Große Straße!");
+  else if (categoryId === "fullHouse" && points === 25) showReaction("🏡 Full House!");
+  else if (categoryId === "fourKind" && maxKind >= 4) showReaction("🎲 Viererpasch!");
+  if (state.current === state.players.length - 1) state.round++;
   if (state.round > TOTAL_ROUNDS) { state.over = true; push(); finishGame(); return; }
-  state.current = 1 - state.current;
+  state.current = (state.current + 1) % state.players.length;
   resetTurn();
   render();
   const scoredCell = $("c-" + playerIndex + "-" + categoryId);
@@ -755,9 +969,9 @@ function finishGame() {
   finishedGameId = currentGameId;
   Sound.end(); 
   const t = state.players.map(p => calculateTotals(p.scores));
-  const winningIndex = getWinningIndex(t);
-  updateWinnerText(t, winningIndex);
-  const record = recordFinishedGame(t, winningIndex);
+  const winningIndexes = getWinningIndexes(t);
+  updateWinnerText(t, winningIndexes);
+  const record = recordFinishedGame(t, winningIndexes);
   const box = $("finalSummary");
   box.innerHTML = "";
   t.forEach((tot, i) => {
@@ -794,16 +1008,18 @@ function finishGame() {
   showScreen("end");
 }
 
-function getWinningIndex(totals) {
-  return totals[0].total === totals[1].total ? -1 : (totals[0].total > totals[1].total ? 0 : 1);
+function getWinningIndexes(totals) {
+  const highScore = Math.max(...totals.map(total => total.total));
+  return totals.flatMap((total, index) => total.total === highScore ? [index] : []);
 }
-function updateWinnerText(totals, winningIndex = getWinningIndex(totals)) {
-  $("winnerText").textContent = winningIndex < 0 ? "Unentschieden!"
-    : "🎃 " + playerNames[winningIndex] + " gewinnt!";
+function updateWinnerText(totals, winningIndexes = getWinningIndexes(totals)) {
+  $("winnerText").textContent = winningIndexes.length > 1
+    ? "Unentschieden zwischen " + winningIndexes.map(index => playerNames[index]).join(", ") + "!"
+    : "🎃 " + playerNames[winningIndexes[0]] + " gewinnt!";
 }
 
-function recordFinishedGame(totals, winningIndex) {
-  const newBadges = [[], []];
+function recordFinishedGame(totals, winningIndexes) {
+  const newBadges = totals.map(() => []);
   let stats = {};
   try {
     const recorded = JSON.parse(localStorage.getItem(RECORDED_GAMES_KEY) || "[]");
@@ -814,9 +1030,11 @@ function recordFinishedGame(totals, winningIndex) {
       const profile = stats[name] || { games:0, wins:0, draws:0, kniffels:0, bonusGames:0, best:0, streak:0, badges:[] };
       const previousBest = profile.best;
       profile.games++;
-      if (winningIndex === i) { profile.wins++; profile.streak++; }
-      else if (winningIndex < 0) { profile.draws++; profile.streak = 0; }
-      else profile.streak = 0;
+      if (winningIndexes.includes(i) && winningIndexes.length === 1) { profile.wins++; profile.streak++; }
+      else {
+        if (winningIndexes.includes(i)) profile.draws++;
+        profile.streak = 0;
+      }
       if (scorecard.yahtzee >= 50) profile.kniffels++;
       if (tot.bonus) profile.bonusGames++;
       profile.best = Math.max(previousBest, tot.total);
@@ -840,9 +1058,7 @@ function setTheme() {
   document.body.dataset.theme = "halloween";
   $("themeDecor").innerHTML = "<span>🦇</span><span>🎃</span><span>👻</span>";
   $("endDecor").innerHTML = "<span>🏆</span>";
-  $("scare").querySelector(".face").textContent = "💀";
   document.title = "Kniffel – Halloween";
-  try { localStorage.setItem("kniffelTheme", "halloween"); } catch (e) {}
   const trackSelect = $("trackSel");
   trackSelect.replaceChildren();
   Sound.trackNames.forEach((name, index) => {
@@ -870,20 +1086,11 @@ function createDieElement(value, tag) {
   return el;
 }
 
-function updateRollingDieFaces() {
-  if (!state) return;
-  state.rollingIdx.forEach(i => {
-    const die = $("diceArea").querySelector(`[data-die-index="${i}"]`);
-    if (!die) return;
-    const pips = PIP_LAYOUT[state.shown[i]] || [];
-    Array.from(die.children).forEach((pip, index) => pip.classList.toggle("pip", pips.includes(index)));
-    die.setAttribute("aria-label", "Würfel " + (i + 1) + ": " + state.shown[i]);
-  });
-}
-
 function buildSheet() {
   const sheet = $("sheet");
   sheet.innerHTML = "";
+  const playerCount = state?.players.length || playerNames.length;
+  sheet.style.setProperty("--player-count", playerCount);
   const addRow = (cls, label, cells) => {
     const row = document.createElement("div");
     row.className = "srow " + cls;
@@ -895,7 +1102,7 @@ function buildSheet() {
   };
   const textCell = id => { const s = document.createElement("span"); s.className = "cell"; s.id = id; return s; };
   const catRows = block => CATEGORIES.filter(c => c.block === block).forEach(cat =>
-    addRow("", cat.label, [0, 1].map(p => {
+    addRow("", cat.label, Array.from({ length: playerCount }, (_, p) => {
       const b = document.createElement("button");
       b.className = "cell"; b.id = "c-" + p + "-" + cat.id;
       b.addEventListener("click", () => scoreCategory(p, cat.id));
@@ -903,29 +1110,48 @@ function buildSheet() {
     })));
   const addSep = () => { const s = document.createElement("div"); s.className = "sep"; sheet.appendChild(s); };
 
-  addRow("shead", "", [textCell("head-0"), textCell("head-1")]);
+  addRow("shead", "", Array.from({ length: playerCount }, (_, p) => textCell("head-" + p)));
   catRows("upper");
-  addRow("info", "Summe oben (Bonus ab " + BONUS_THRESHOLD + ")", [textCell("up-0"), textCell("up-1")]);
-  addRow("info", "Bonus (+" + BONUS_POINTS + ")", [textCell("bo-0"), textCell("bo-1")]);
+  addRow("info", "Summe oben (Bonus ab " + BONUS_THRESHOLD + ")", Array.from({ length: playerCount }, (_, p) => textCell("up-" + p)));
+  addRow("info", "Bonus (+" + BONUS_POINTS + ")", Array.from({ length: playerCount }, (_, p) => textCell("bo-" + p)));
   addSep();
   catRows("lower");
   addSep();
-  addRow("info total", "Gesamt", [textCell("tot-0"), textCell("tot-1")]);
+  addRow("info total", "Gesamt", Array.from({ length: playerCount }, (_, p) => textCell("tot-" + p)));
 }
 
 function render() {
   const totals = state.players.map(p => calculateTotals(p.scores));
   const myTurn = isMyTurn();
   $("roundLabel").textContent = Math.min(state.round, TOTAL_ROUNDS) + " / " + TOTAL_ROUNDS;
-  [0, 1].forEach(p => {
+  state.players.forEach((_, p) => {
     $("chip" + p).textContent = playerNames[p] + ": " + totals[p].total;
     $("chip" + p).classList.toggle("turn", p === state.current);
   });
-  $("turnBanner").textContent = myTurn ? "🎃 " + playerNames[mySeat] + ", du bist dran"
-                                       : "👻 " + playerNames[state.current] + " ist dran …";
+  [0, 1, 2, 3].forEach(p => { $("chip" + p).hidden = p >= state.players.length; });
+  const turnBanner = $("turnBanner");
+  turnBanner.textContent = myTurn ? "🎃 " + playerNames[mySeat] + ", du bist dran"
+                                  : "👻 " + playerNames[state.current] + " ist dran …";
+  turnBanner.classList.toggle("other-turn", !myTurn);
+  if (renderedTurn !== null && renderedTurn !== state.current) {
+    turnBanner.classList.remove("turn-change");
+    void turnBanner.offsetWidth;
+    turnBanner.classList.add("turn-change");
+  }
+  renderedTurn = state.current;
 
   // Würfel erst nach dem ersten Wurf sichtbar
   const area = $("diceArea");
+  const focusedDieIndex = area.contains(document.activeElement)
+    ? Array.from(area.querySelectorAll(".die")).indexOf(document.activeElement) : -1;
+  area.onkeydown = event => {
+    const die = event.target.closest(".die");
+    if (event.code !== "Space" || event.repeat || !die || die.disabled) return;
+    event.preventDefault();
+    const dice = Array.from(area.querySelectorAll(".die"));
+    const index = dice.indexOf(die);
+    if (index !== -1) toggleHold(index);
+  };
   area.innerHTML = "";
   if (!hasRolled()) {
     area.innerHTML = '<div class="dice-hidden"><div class="big">🎃</div><div>Die Würfel liegen noch im Dunkeln …</div></div>';
@@ -934,8 +1160,9 @@ function render() {
     row.className = "dice-row";
     state.shown.forEach((value, i) => {
       const die = createDieElement(value, "button");
-      die.dataset.dieIndex = i;
-      die.setAttribute("aria-label", "Würfel " + (i + 1) + ": " + value);
+      die.setAttribute("aria-label", "Würfel " + (i + 1) + ": " + value + (state.held[i] ? ", festgehalten" : ", antippen zum Festhalten"));
+      die.setAttribute("aria-pressed", String(Boolean(state.held[i])));
+      die.style.setProperty("--roll-delay", (i * 28) + "ms");
       if (state.held[i]) die.classList.add("held");
       if (state.rollingIdx.has(i)) die.classList.add("rolling");
       if (state.landedIdx.has(i)) die.classList.add("landed");
@@ -944,6 +1171,13 @@ function render() {
       row.appendChild(die);
     });
     area.appendChild(row);
+    const dice = Array.from(row.querySelectorAll(".die"));
+    if (focusDieAfterRoll && !state.busy) {
+      dice[0]?.focus();
+      focusDieAfterRoll = false;
+    } else if (focusedDieIndex >= 0 && dice[focusedDieIndex] && !dice[focusedDieIndex].disabled) {
+      dice[focusedDieIndex].focus();
+    }
   }
 
   $("rollsText").textContent = "Würfe übrig: " + state.rollsLeft;
@@ -953,10 +1187,10 @@ function render() {
   $("hint").textContent = !myTurn ? "Warte auf " + playerNames[state.current] + " …"
     : !hasRolled() ? "Würfle, um deinen Zug zu beginnen."
     : state.rollsLeft === 0 ? "Keine Würfe mehr – trage eine Wertung ein."
-    : "Würfel antippen zum Festhalten oder direkt eine Wertung wählen.";
+    : "Würfel antippen oder mit Tab auswählen und Leertaste festhalten; danach eine Wertung wählen.";
 
   // Wertungsbogen: nur die eigene Spalte ist am eigenen Zug anklickbar
-  [0, 1].forEach(p => {
+  state.players.forEach((_, p) => {
     const sc = state.players[p].scores;
     $("head-" + p).textContent = playerNames[p] + (p === mySeat ? " (du)" : "");
     $("head-" + p).classList.toggle("turn", p === state.current);
@@ -971,6 +1205,8 @@ function render() {
       el.className = "cell" + (used ? " used" : "") + (playable ? " avail" : "");
       el.disabled = !playable;
       el.textContent = used ? sc[cat.id] : (mine ? calculateScore(cat.id, state.dice) : "");
+      el.setAttribute("aria-label", cat.label + (used ? ": " + sc[cat.id] + " Punkte" : mine
+        ? ": " + calculateScore(cat.id, state.dice) + " Punkte eintragen" : ": noch nicht verfügbar"));
     });
   });
 }
@@ -983,15 +1219,29 @@ $("copyRoomCodeBtn").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(roomId); $("copyRoomCodeBtn").textContent = "Code kopiert ✓"; }
   catch (e) { $("lobbyMsg").textContent = "Raumcode: " + roomId + " (bitte manuell kopieren)"; }
 });
+$("copyInviteLinkBtn").addEventListener("click", async () => {
+  const invite = new URL(location.href);
+  invite.searchParams.set("room", roomId);
+  try {
+    await navigator.clipboard.writeText(invite.href);
+    $("copyInviteLinkBtn").textContent = "Link kopiert ✓";
+  } catch (e) {
+    window.prompt("Kopiere diesen Einladungslink:", invite.href);
+  }
+});
 $("leaveLobbyBtn").addEventListener("click", () => leaveRoom("Der Raum wurde geschlossen."));
 $("leaveGameBtn").addEventListener("click", () => {
-  if (confirm("Raum wirklich verlassen? Der Raum wird für beide Spieler geschlossen.")) leaveRoom("Du hast den Raum verlassen.");
+  if (confirm("Raum wirklich verlassen? Der Raum wird für alle Spieler geschlossen.")) leaveRoom("Du hast den Raum verlassen.");
 });
 $("restartBtn").addEventListener("click", async () => {
-  if (!confirm("Neue Runde für beide Spieler starten?")) return;
-  const { ok, data } = await api("/api/new", { roomId, seat: mySeat, token: seatToken });
-  if (!ok) showReaction(data.error || "Neustart nicht möglich.");
-  else lastVersion = -1;
+  if (!confirm("Eine neue Partie für alle Spieler starten?")) return;
+  try {
+    const { ok, data } = await api("/api/new", { roomId, seat: mySeat, token: seatToken });
+    if (!ok) showReaction(data.error || "Neustart nicht möglich.", { force: true });
+    else { startNewLocalGameRecord(); lastVersion = -1; }
+  } catch (e) {
+    setConnectionStatus(false, "Neustart wird durch die unterbrochene Verbindung verhindert.", true);
+  }
 });
 $("rollBtn").addEventListener("click", rollDice);
 $("againBtn").addEventListener("click", async () => {
@@ -1002,28 +1252,47 @@ $("againBtn").addEventListener("click", async () => {
 });
 $("menuBtn").addEventListener("click", () => leaveRoom("Der Raum wurde geschlossen."));
 
+if (inviteRoom) $("roomCodeInput").value = inviteRoom.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, "").slice(0, 6);
+
 if (mySeat !== null && roomId && seatToken) {
   $("roomControls").hidden = true;
   $("waitingLobby").hidden = false;
   $("roomSlots").hidden = false;
   $("roomCodeDisplay").textContent = roomId;
-  $("lobbyMsg").textContent = "Verbinde wieder mit deinem Raum …";
+  $("lobbyMsg").textContent = "Deine Partie wird wiederhergestellt …";
 } else {
   mySeat = null;
-  try { ["kniffelSeat", "kniffelRoomId", "kniffelSeatToken"].forEach(key => sessionStorage.removeItem(key)); } catch (e) {}
+  clearRoomSession();
   setConnectionStatus(true, "Erstelle einen Raum oder tritt mit Code bei");
 }
-setInterval(poll, POLL_MS);
+if (mySeat !== null) schedulePoll(0);
+window.addEventListener("online", () => { networkFailures = 0; schedulePoll(0); });
+window.addEventListener("offline", () => setConnectionStatus(false, "Offline · warte auf Netzwerk", true));
+document.addEventListener("visibilitychange", () => { if (!document.hidden && mySeat !== null) schedulePoll(0); });
 /* ===== Ton-Einstellungen ===== */
 ["pointerdown", "keydown"].forEach(ev => document.addEventListener(ev, () => Sound.init()));
-$("gearBtn").addEventListener("click", () => $("audioPanel").classList.toggle("open"));
-document.addEventListener("pointerdown", e => {
-  if (!$("audioPanel").contains(e.target) && !$("gearBtn").contains(e.target)) $("audioPanel").classList.remove("open");
+$("gearBtn").addEventListener("click", () => {
+  const open = $("audioPanel").classList.toggle("open");
+  $("gearBtn").setAttribute("aria-expanded", String(open));
 });
-document.addEventListener("keydown", e => { if (e.key === "Escape") $("audioPanel").classList.remove("open"); });
+document.addEventListener("pointerdown", e => {
+  if (!$("audioPanel").contains(e.target) && !$("gearBtn").contains(e.target)) {
+    $("audioPanel").classList.remove("open");
+    $("gearBtn").setAttribute("aria-expanded", "false");
+  }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    $("audioPanel").classList.remove("open");
+    $("gearBtn").setAttribute("aria-expanded", "false");
+    $("gearBtn").focus();
+  }
+});
+$("reactionsOn").checked = Sound.settings.reactionsOn;
 $("musicOn").checked = Sound.settings.musicOn;
 $("musicVol").value = Math.round(Sound.settings.music * 100);
 $("sfxVol").value = Math.round(Sound.settings.sfx * 100);
+$("reactionsOn").addEventListener("change", e => Sound.setReactionsOn(e.target.checked));
 $("musicOn").addEventListener("change", e => Sound.setMusicOn(e.target.checked));
 $("trackSel").addEventListener("change", e => Sound.setTrack(Number(e.target.value)));
 $("musicVol").addEventListener("input", e => Sound.setMusicVol(e.target.value / 100));
@@ -1033,19 +1302,27 @@ setTheme("halloween");
 
 /* ===== Easter Egg: 10x auf das K ===== */
 let kClicks = 0, kTimer = null;
-function hideScare() { $("scare").classList.remove("on"); }
+function hideScare() {
+  const video = $("scareVideo");
+  video.pause();
+  video.currentTime = 0;
+  $("scare").classList.remove("on");
+}
 $("kEgg").addEventListener("click", () => {
   kClicks++;
   clearTimeout(kTimer);
   kTimer = setTimeout(() => { kClicks = 0; }, 2500);
   if (kClicks >= 10) {
     kClicks = 0;
+    const video = $("scareVideo");
+    video.volume = Sound.settings.sfx;
+    video.currentTime = 0;
     $("scare").classList.add("on");
-    Sound.scare();
-    setTimeout(hideScare, 1800);
+    video.play().catch(hideScare);
   }
 });
 $("scare").addEventListener("click", hideScare);
+$("scareVideo").addEventListener("ended", hideScare);
 </script>
 </body>
 </html>
