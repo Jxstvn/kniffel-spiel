@@ -280,6 +280,7 @@
   <input type="range" id="musicVol" min="0" max="100">
   <label for="sfxVol">Effekt-Lautstärke</label>
   <input type="range" id="sfxVol" min="0" max="100">
+  <button class="btn ghost" id="singlePlayerBtn" type="button" hidden>Singleplayer testen</button>
 </div>
 <div id="scare" aria-label="Jumpscare"><video id="scareVideo" playsinline preload="auto">
   <source src="vlipsy-creepy-face-jump-scare-3hEsFXt9.mp4" type="video/mp4">
@@ -471,8 +472,9 @@ function calculateTotals(scores) {
 let playerNames = ["Spieler 1", "Spieler 2"];
 let opponentConnectionState = null;
 let focusDieAfterRoll = false;
+let singlePlayer = false;
 let state = null;        // aktueller Spielstand (kommt vom Server)
-let mySeat = null;       // 0 = Spieler 1, 1 = Spieler 2
+let mySeat = null;       // Sitzplatz im Mehrspielerraum
 let roomId = null;
 let seatToken = null;
 let lastVersion = -1;    // zuletzt übernommene Server-Version
@@ -517,7 +519,7 @@ const inviteRoom = new URLSearchParams(location.search).get("room");
 try {
   const savedRoom = JSON.parse(localStorage.getItem("kniffelRoomSession") || "null");
   if (savedRoom && (!inviteRoom || savedRoom.roomId === inviteRoom.toUpperCase()) &&
-      Number.isInteger(savedRoom.seat) && savedRoom.seat >= 0 && savedRoom.seat <= 1 &&
+      Number.isInteger(savedRoom.seat) && savedRoom.seat >= 0 && savedRoom.seat <= 3 &&
       typeof savedRoom.roomId === "string" && /^[A-HJ-NP-Z2-9]{6}$/i.test(savedRoom.roomId) &&
       typeof savedRoom.token === "string" && savedRoom.token.length > 0) {
     mySeat = savedRoom.seat;
@@ -529,7 +531,7 @@ try {
     seatToken = sessionStorage.getItem("kniffelSeatToken");
   }
 } catch (e) {}
-if (mySeat !== null && (!Number.isInteger(mySeat) || mySeat < 0 || mySeat > 1 ||
+if (mySeat !== null && (!Number.isInteger(mySeat) || mySeat < 0 || mySeat > 3 ||
     typeof roomId !== "string" || !/^[A-HJ-NP-Z2-9]{6}$/i.test(roomId) ||
     typeof seatToken !== "string" || !seatToken)) {
   mySeat = null; roomId = null; seatToken = null;
@@ -543,7 +545,7 @@ try {
 } catch (e) {}
 
 const hasRolled = () => state.rollsLeft < MAX_ROLLS;
-const isMyTurn = () => state !== null && !state.over && state.current === mySeat;
+const isMyTurn = () => state !== null && !state.over && (singlePlayer || state.current === mySeat);
 const randomDie = () => Math.floor(Math.random() * 6) + 1;
 
 function showReaction(message, { force = false } = {}) {
@@ -738,6 +740,7 @@ async function flushPendingMove() {
 }
 
 function push() {
+  if (singlePlayer) return;
   pendingMove = JSON.parse(JSON.stringify({
     players: state.players, current: state.current, round: state.round, dice: state.dice,
     held: state.held, rollsLeft: state.rollsLeft, over: state.over,
@@ -748,6 +751,7 @@ function push() {
 }
 
 function enterRoom(data) {
+  singlePlayer = false;
   mySeat = data.seat; roomId = data.roomId; seatToken = data.token; lastVersion = -1;
   opponentConnectionState = null;
   saveRoomSession();
@@ -784,7 +788,10 @@ async function joinRoom() {
 
 function leaveToStart(message = "") {
   discardPendingMove();
+  singlePlayer = false;
   mySeat = null; state = null; roomId = null; seatToken = null; lastVersion = -1;
+  playerNames = ["Spieler 1", "Spieler 2"];
+  $("leaveGameBtn").textContent = "Raum verlassen";
   clearTimeout(pollTimer);
   pollTimer = null;
   clearRoomSession();
@@ -797,7 +804,38 @@ function leaveToStart(message = "") {
   updateLobbySlots([]);
   $("lobbyMsg").textContent = message;
   setConnectionStatus(true, "Erstelle einen Raum oder tritt mit Code bei");
+  document.title = "Kniffel – Halloween";
   showScreen("start");
+}
+
+function startSinglePlayerGame() {
+  if (mySeat !== null || roomId) {
+    showReaction("Verlasse zuerst den Mehrspielerraum, um den Testmodus zu starten.", { force: true });
+    return;
+  }
+  singlePlayer = true;
+  playerNames = ["Du"];
+  startNewLocalGameRecord();
+  state = {
+    players: [{ scores: Object.fromEntries(CATEGORIES.map(category => [category.id, null])) }],
+    current: 0, round: 1, dice: [0,0,0,0,0], held: [false,false,false,false,false],
+    rollsLeft: MAX_ROLLS, over: false, rolling: [], rollId: 0, gameId: currentGameId,
+    busy: false, rollingIdx: new Set(), landedIdx: new Set(), shown: [0,0,0,0,0]
+  };
+  lastVersion = -1;
+  if (sheetPlayerCount !== 1) {
+    buildSheet();
+    sheetPlayerCount = 1;
+  }
+  $("audioPanel").classList.remove("open");
+  $("gearBtn").setAttribute("aria-expanded", "false");
+  $("reconnectNote").hidden = true;
+  $("gameConnection").textContent = "Einzelspieler";
+  $("gameConnection").className = "connection-chip online";
+  $("leaveGameBtn").textContent = "Einzelpartie verlassen";
+  document.title = "Kniffel – Einzelspieler-Test";
+  showScreen("game");
+  render();
 }
 
 async function leaveRoom(message = "") {
@@ -941,7 +979,8 @@ function toggleHold(index) {
 }
 
 function scoreCategory(playerIndex, categoryId) {
-  if (!isMyTurn() || playerIndex !== mySeat || state.busy || !hasRolled()) return;
+  const ownSeat = singlePlayer ? 0 : mySeat;
+  if (!isMyTurn() || playerIndex !== ownSeat || state.busy || !hasRolled()) return;
   const scores = state.players[playerIndex].scores;
   if (scores[categoryId] !== null) return;
   Sound.score();
@@ -971,7 +1010,9 @@ function finishGame() {
   const t = state.players.map(p => calculateTotals(p.scores));
   const winningIndexes = getWinningIndexes(t);
   updateWinnerText(t, winningIndexes);
-  const record = recordFinishedGame(t, winningIndexes);
+  const record = singlePlayer
+    ? { newBadges: state.players.map(() => []), stats: {} }
+    : recordFinishedGame(t, winningIndexes);
   const box = $("finalSummary");
   box.innerHTML = "";
   t.forEach((tot, i) => {
@@ -986,7 +1027,8 @@ function finishGame() {
     const detail = document.createElement("div"); detail.className = "recap-detail";
     detail.textContent = "Topwertung: " + (bestCategory ? bestCategory.label + " · " + scores[bestCategory.id] + " Punkte" : "–")
       + (scores.yahtzee >= 50 ? " · Kniffel erzielt" : "")
-      + " · " + (record.stats[playerNames[i]]?.wins || 0) + " Siege in " + (record.stats[playerNames[i]]?.games || 0) + " Partien";
+      + (singlePlayer ? " · Testpartie, Statistiken nicht gespeichert"
+        : " · " + (record.stats[playerNames[i]]?.wins || 0) + " Siege in " + (record.stats[playerNames[i]]?.games || 0) + " Partien");
     d.appendChild(detail);
     box.appendChild(d);
   });
@@ -1013,7 +1055,7 @@ function getWinningIndexes(totals) {
   return totals.flatMap((total, index) => total.total === highScore ? [index] : []);
 }
 function updateWinnerText(totals, winningIndexes = getWinningIndexes(totals)) {
-  $("winnerText").textContent = winningIndexes.length > 1
+  $("winnerText").textContent = singlePlayer ? "🎲 Einzelpartie geschafft!" : winningIndexes.length > 1
     ? "Unentschieden zwischen " + winningIndexes.map(index => playerNames[index]).join(", ") + "!"
     : "🎃 " + playerNames[winningIndexes[0]] + " gewinnt!";
 }
@@ -1123,6 +1165,7 @@ function buildSheet() {
 function render() {
   const totals = state.players.map(p => calculateTotals(p.scores));
   const myTurn = isMyTurn();
+  const ownSeat = singlePlayer ? 0 : mySeat;
   $("roundLabel").textContent = Math.min(state.round, TOTAL_ROUNDS) + " / " + TOTAL_ROUNDS;
   state.players.forEach((_, p) => {
     $("chip" + p).textContent = playerNames[p] + ": " + totals[p].total;
@@ -1130,7 +1173,7 @@ function render() {
   });
   [0, 1, 2, 3].forEach(p => { $("chip" + p).hidden = p >= state.players.length; });
   const turnBanner = $("turnBanner");
-  turnBanner.textContent = myTurn ? "🎃 " + playerNames[mySeat] + ", du bist dran"
+  turnBanner.textContent = myTurn ? (singlePlayer ? "🎲 Deine Einzelpartie" : "🎃 " + playerNames[ownSeat] + ", du bist dran")
                                   : "👻 " + playerNames[state.current] + " ist dran …";
   turnBanner.classList.toggle("other-turn", !myTurn);
   if (renderedTurn !== null && renderedTurn !== state.current) {
@@ -1192,7 +1235,7 @@ function render() {
   // Wertungsbogen: nur die eigene Spalte ist am eigenen Zug anklickbar
   state.players.forEach((_, p) => {
     const sc = state.players[p].scores;
-    $("head-" + p).textContent = playerNames[p] + (p === mySeat ? " (du)" : "");
+    $("head-" + p).textContent = playerNames[p] + (p === ownSeat ? " (du)" : "");
     $("head-" + p).classList.toggle("turn", p === state.current);
     $("up-" + p).textContent = totals[p].upper + " / " + BONUS_THRESHOLD;
     $("bo-" + p).textContent = totals[p].bonus;
@@ -1200,7 +1243,7 @@ function render() {
     CATEGORIES.forEach(cat => {
       const el = $("c-" + p + "-" + cat.id);
       const used = sc[cat.id] !== null;
-      const mine = p === mySeat && myTurn && hasRolled() && !state.busy;
+      const mine = p === ownSeat && myTurn && hasRolled() && !state.busy;
       const playable = mine && !used;
       el.className = "cell" + (used ? " used" : "") + (playable ? " avail" : "");
       el.disabled = !playable;
@@ -1231,9 +1274,11 @@ $("copyInviteLinkBtn").addEventListener("click", async () => {
 });
 $("leaveLobbyBtn").addEventListener("click", () => leaveRoom("Der Raum wurde geschlossen."));
 $("leaveGameBtn").addEventListener("click", () => {
-  if (confirm("Raum wirklich verlassen? Der Raum wird für alle Spieler geschlossen.")) leaveRoom("Du hast den Raum verlassen.");
+  const question = singlePlayer ? "Einzelpartie verlassen?" : "Raum wirklich verlassen? Der Raum wird für alle Spieler geschlossen.";
+  if (confirm(question)) leaveRoom(singlePlayer ? "Du hast die Einzelpartie verlassen." : "Du hast den Raum verlassen.");
 });
 $("restartBtn").addEventListener("click", async () => {
+  if (singlePlayer) { startSinglePlayerGame(); return; }
   if (!confirm("Eine neue Partie für alle Spieler starten?")) return;
   try {
     const { ok, data } = await api("/api/new", { roomId, seat: mySeat, token: seatToken });
@@ -1245,12 +1290,14 @@ $("restartBtn").addEventListener("click", async () => {
 });
 $("rollBtn").addEventListener("click", rollDice);
 $("againBtn").addEventListener("click", async () => {
+  if (singlePlayer) { startSinglePlayerGame(); return; }
   try {
     const { ok } = await api("/api/new", { roomId, seat: mySeat, token: seatToken });
     if (ok) { startNewLocalGameRecord(); lastVersion = -1; }
   } catch (e) {}
 });
 $("menuBtn").addEventListener("click", () => leaveRoom("Der Raum wurde geschlossen."));
+$("singlePlayerBtn").addEventListener("click", startSinglePlayerGame);
 
 if (inviteRoom) $("roomCodeInput").value = inviteRoom.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, "").slice(0, 6);
 
@@ -1266,14 +1313,21 @@ if (mySeat !== null && roomId && seatToken) {
   setConnectionStatus(true, "Erstelle einen Raum oder tritt mit Code bei");
 }
 if (mySeat !== null) schedulePoll(0);
-window.addEventListener("online", () => { networkFailures = 0; schedulePoll(0); });
-window.addEventListener("offline", () => setConnectionStatus(false, "Offline · warte auf Netzwerk", true));
+window.addEventListener("online", () => { if (!singlePlayer) { networkFailures = 0; schedulePoll(0); } });
+window.addEventListener("offline", () => { if (!singlePlayer) setConnectionStatus(false, "Offline · warte auf Netzwerk", true); });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && mySeat !== null) schedulePoll(0); });
 /* ===== Ton-Einstellungen ===== */
 ["pointerdown", "keydown"].forEach(ev => document.addEventListener(ev, () => Sound.init()));
+let gearClickCount = 0;
 $("gearBtn").addEventListener("click", () => {
+  gearClickCount++;
   const open = $("audioPanel").classList.toggle("open");
   $("gearBtn").setAttribute("aria-expanded", String(open));
+  if (gearClickCount >= 5 && !singlePlayer && mySeat === null) {
+    $("singlePlayerBtn").hidden = false;
+    $("audioPanel").classList.add("open");
+    $("gearBtn").setAttribute("aria-expanded", "true");
+  }
 });
 document.addEventListener("pointerdown", e => {
   if (!$("audioPanel").contains(e.target) && !$("gearBtn").contains(e.target)) {
